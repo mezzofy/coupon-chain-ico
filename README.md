@@ -1,6 +1,6 @@
 # CCT Token Smart Controct
 
-The crowdsale will be conducted on Ethereum’s blockchain and will involve 4 smart contracts:
+The crowdsale will be conducted on Ethereum’s blockchain and will involve 3 smart contracts:
 
 <br />
 
@@ -18,7 +18,6 @@ The Sale contract is organized as follows according to the whitepaper:
 - 10% (50,000,000) of total supply will be minted and sent to a single founding team wallet.
 - 20% (100,000,000) of total supply will be minted and sent to a single presale wallet address.
 - 20% (100,000,000) of total supply will be available for minting and purchase by public.
-Tokens are non-transferrable in these wallets and can only be unlocked by the Vesting contract.
 
 ## Vesting Contract
 The Vesting Contract will control the distribution of the release of tokens using the following conditions:
