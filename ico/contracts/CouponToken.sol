@@ -15,23 +15,8 @@ contract CouponToken is StandardToken, Ownable {
     string public constant symbol = "CCT";
     uint8 public constant decimals = 18;
 
-    // Total coupon supply, 1 billion
-    uint256 public constant TOTAL_COUPON_SUPPLY = 1000000000 * (10 ** uint256(decimals));
-    
-    // Coupon Sale Allowance for Crowd Sales, 500 million
-    uint256 public constant TOKEN_SALE_ALLOWANCE =  500000000 * (10 ** uint256(decimals));
-
     // Address of CouponTokenSale contract
     CouponTokenSale public couponSaleAddr;
-
-    // Enable transfer after coupon token sale is completed
-    bool public transferEnabled = false;
-
-
-    modifier onlyWhenTransferAllowed() {
-        require(transferEnabled == true);
-        _;
-    }
 
     /*
      * Check if token sale address is not set
@@ -48,7 +33,7 @@ contract CouponToken is StandardToken, Ownable {
 
     modifier onlyIfFounderVestingPeriodComplete(address sender) {
         if(couponSaleAddr.founders(sender) > 0) {
-            require(now >= couponSaleAddr.endTime() + (2 * 365 days));
+            require(now >= couponSaleAddr.endSaleTime() + (2 * 365 days));
         }
         _;
     }
@@ -59,20 +44,6 @@ contract CouponToken is StandardToken, Ownable {
     }
 
 
-    /*
-     * Set transferEnabled variable to true
-     */
-    function enableTransfer() external onlyOwner {
-        transferEnabled = true;
-        //approve(tokenSaleAddr, 0);
-    }
-
-    /*
-     * Set transferEnabled variable to false
-     */
-    function disableTransfer() external onlyOwner {
-        transferEnabled = false;
-    }
 
     /**
    * @dev Function to mint tokens
@@ -97,9 +68,6 @@ contract CouponToken is StandardToken, Ownable {
      */
     function transfer(address to, uint256 value)
         public
-        onlyWhenTransferAllowed
-        //onlyValidDestination(to)
-        //onlyAllowedAmount(msg.sender, value)
         onlyIfFounderVestingPeriodComplete(msg.sender)
         returns (bool)
     {
@@ -115,9 +83,6 @@ contract CouponToken is StandardToken, Ownable {
      */
     function transferFrom(address from, address to, uint256 value)
         public
-        onlyWhenTransferAllowed
-        //onlyValidDestination(to)
-        //onlyAllowedAmount(from, value)
         onlyIfFounderVestingPeriodComplete(from)
         returns (bool)
     {

@@ -8,16 +8,14 @@ contract CouponTokenSale is Pausable {
     using SafeMath for uint256;
 
     // Start time of Sale
-    uint256 public startTime;
+    uint256 public startSaleTime;
 
     // Start time of the Sale-lot 4
     uint256 public startTimeOfSaleLot4;
 
     // End time of Sale
-    uint256 public endTime;
+    uint256 public endSaleTime;
 
-    // Sales ended 
-    bool public salesEnded;
 
     uint256 private rateEth2Cents;
 
@@ -42,6 +40,12 @@ contract CouponTokenSale is Pausable {
      *
     */
     uint8 public constant decimals = 18;
+
+    // Total coupon supply, 1 billion
+    uint256 public constant TOTAL_COUPON_SUPPLY = 1000000000 * (10 ** uint256(decimals)); // 1 billion
+    
+    // Coupon Sale Allowance for Crowd Sales, 500 million
+    uint256 public constant TOKEN_SALE_ALLOWANCE =  500000000 * (10 ** uint256(decimals)); // 500 million
     
     // Maximum CAP for founders, 100 million
     uint256 public constant MAX_CAP_FOR_FOUNDERS = 100000000 * (10 ** uint256(decimals)); // 100 million
@@ -102,6 +106,7 @@ contract CouponTokenSale is Pausable {
     struct BuyerInfoForPoolBonus {
         address addr;
         uint256 noOfTokensBought;
+        uint256 bonusTokensAlotted;
     }
 
     // Information related to lots
@@ -112,6 +117,7 @@ contract CouponTokenSale is Pausable {
         uint256 soldTokens;
         uint256 totalCentsRaised;
         BuyerInfoForPoolBonus[] buyerInfoForPoolBonus;
+        bool poolBonusCalculated;
     }
 
     // List of Lots information
@@ -134,15 +140,6 @@ contract CouponTokenSale is Pausable {
     event SaleStarted(uint256 startTime);
 
     /*
-     * Event for sale end logging
-     *
-     * @param endTime: End date of sale
-     * @param totalWeiRaised: Total amount of raised in Wei after sale ended
-     * 
-     */
-    event SaleEnded(uint256 endTime, uint256 totalWeiRaised);
-
-    /*
      * Event for token purchase
      *
      * @param purchaser: Who paid for the tokens
@@ -160,7 +157,7 @@ contract CouponTokenSale is Pausable {
     }
 
     modifier onlyValidPurchase() {
-        require(now >= startTime);
+        require(now >= startSaleTime);
 
         address purchaser = msg.sender;
 
@@ -181,9 +178,6 @@ contract CouponTokenSale is Pausable {
 
         // Initially set the state as Ended
         stage = Stages.Ended;
-
-        // Initialise the saleEnded with false
-        salesEnded = false;
 
         // Fill Lots Information to structure
         lotsInfo[SALE_LOT1].totalTokens = MAX_CAP_FOR_LOT1;
@@ -251,19 +245,7 @@ contract CouponTokenSale is Pausable {
 
     }
 
-    /*
-     *
-     *
-    */
-    function setEth2Cents(uint256 rate) 
-        public
-        onlyOwner {
-
-        rateEth2Cents = rate;
-
-    }
-
-    /*
+      /*
      * Allocation to Founders
      *
      */
@@ -301,6 +283,18 @@ contract CouponTokenSale is Pausable {
 
 
     /*
+     *
+     *
+    */
+    function setEth2Cents(uint256 rate) 
+        public
+        onlyOwner {
+
+        rateEth2Cents = rate;
+
+    }
+
+    /*
      * Start sale
      */
     function startSale()
@@ -312,26 +306,23 @@ contract CouponTokenSale is Pausable {
         
         stage = Stages.Started;
         currLot = SALE_LOT1;
-        startTime = now;
+        startSaleTime = now;
 
         // Fire the event
-        emit SaleStarted(startTime);
+        emit SaleStarted(startSaleTime);
     }
 
      /*
      * End sale
      */
-    function endSale() external onlyOwner atStage(Stages.Started) {
-        endTime = now;
+    function endSale() private {
+        endSaleTime = now;
         stage = Stages.Ended;
-
-        emit SaleEnded(endTime, totalWeiRaised);
     }
 
     /*
      * Function: buy()
      */
-
     function buy()
         public 
         payable
@@ -406,12 +397,13 @@ contract CouponTokenSale is Pausable {
         lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(purchaseToken + needToTakeFromTreasury);
         lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
 
-        BuyerInfoForPoolBonus memory buyer = BuyerInfoForPoolBonus(purchaser, totalTokens);
+        BuyerInfoForPoolBonus memory buyer = BuyerInfoForPoolBonus(purchaser, totalTokens, 0);
         
         // See the buyer already in list
         for(uint i = 0; i < lotsInfo[currLot].buyerInfoForPoolBonus.length; i++) {
             if(lotsInfo[currLot].buyerInfoForPoolBonus[i].addr == buyer.addr) {
-                lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought = lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought.add(totalTokens);
+                lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought = 
+                    lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought.add(totalTokens);
                 break; // break the for-loop
             }
         }
@@ -433,12 +425,69 @@ contract CouponTokenSale is Pausable {
 
             if(currLot == MAX_SALE_LOTS) {
                 // All sale lots completed, so end the sale
-                stage = Stages.Ended;
+                endSale();
             } 
         }
 
         return totalTokens;
     }
+
+
+    /*
+     *
+     * Function: calculatePoolBonus()
+     *
+     */
+    function calculatePoolBonus() external onlyOwner {
+
+        // Calculate PoolBonus for all the previous lots of current lot
+        for(uint8 i = 0; i < currLot; i++) {
+            // Continue the loop of Pool bonus calculated already
+            if(lotsInfo[i].poolBonusCalculated == true) continue;
+
+            // Enumerate all users who bought more than POOL_BONUS_ELIGIBLE
+            uint256 eligibleBonusUnits;
+            for(uint256 j = 0; j < lotsInfo[i].buyerInfoForPoolBonus.length; j++) {
+                // Bonus eligible?
+                if(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought >= POOL_BONUS_ELIGIBLE)
+                    eligibleBonusUnits = 
+                        eligibleBonusUnits.add(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE));
+            }
+
+            if(eligibleBonusUnits > 0) {
+                // Calculate bonus
+                uint256 bonusShare;
+                if(i == SALE_LOT1)
+                    bonusShare = POOL_BONUS_LOT1.div(eligibleBonusUnits);
+                else if(i == SALE_LOT2)
+                    bonusShare = POOL_BONUS_LOT2.div(eligibleBonusUnits);
+                else if(i == SALE_LOT3)
+                    bonusShare = POOL_BONUS_LOT3.div(eligibleBonusUnits);
+                else if(i == SALE_LOT4)
+                    bonusShare = POOL_BONUS_LOT4.div(eligibleBonusUnits);
+            }
+
+            // Enumerate and allot bonus
+            for(j = 0; j < lotsInfo[i].buyerInfoForPoolBonus.length; j++) {
+                // Bonus eligible?
+                if(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought >= POOL_BONUS_ELIGIBLE) {
+                    // Allot bonus tokens                    
+                    lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted = 
+                        lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE).mul(bonusShare);
+                    
+                    //Transfer Bonus from Treasury
+                    couponToken.transferFrom(treasuryAddr, 
+                        lotsInfo[i].buyerInfoForPoolBonus[j].addr, 
+                        lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted);
+                }           
+            }
+
+            // Mark as Pool Bonus alloted
+            lotsInfo[i].poolBonusCalculated = true;
+
+        } // end-of-outer loop
+
+    } // end-of-function
 
     // function TestFunc(uint256 inWei) public view
     //     returns (uint256) {
