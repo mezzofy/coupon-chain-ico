@@ -273,7 +273,7 @@ contract CouponTokenSale is Pausable {
         atStage(Stages.Setup) {
 
         // Both array length should be same
-        require(Users.length == Tokens.length);
+        require(Users.length > 0 && Users.length == Tokens.length);
 
         // Check the total amount should not cross the MAX_CAP_FOR_FOUNDERS
         uint256 totalFounderAllocation = 0;
