@@ -84,31 +84,39 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
   it("addFounders should not be Owner/Fund/Treasury/Contigency address ",async()=>{
     var founders = [accounts[2],accounts[3],accounts[4]];
     var tokens= [1001,10001,100001];   
-     try {
+
+    try {
       await sale.addFounders(founders,tokens);
-      assert(false, 'addFounders successful, Owner/Fund/Treasury/Contigency address validation not handled');
+      throw(1);
     } catch(err) {
-      assert(true, 'addFounders Failed, test passed ');
+      if(err==1)
+        assert(false, 'addFounders successful, Owner/Fund/Treasury/Contigency address validation not handled');
+      else
+        assert(true, 'addFounders Failed, test passed ');
     }   
-  });  
+  });
 
   it("addFounders should not be greater then 100m ",async()=>{
     var founders = [accounts[5],accounts[6],accounts[7]];
-    var tokens= [1001,10001,100000000 * (10 ** 18)];   
-     try {
-      await sale.addFounders(founders,tokens);
-      assert(false, 'addFounders successful, 100m validation not handled');
-    } catch(err) {
-      assert(true, 'addFounders Failed, test passed ');
-    }   
-  });  
+      var tokens= [1001,10001,100000000*(10 ** 18)];   
+
+      try {
+        await sale.addFounders(founders,tokens);
+        throw(1);
+      } catch(err) {
+        if(err==1)
+          assert(false, 'addFounders successful, Founder limit not handled');
+        else
+          assert(true, 'addFounders Failed, test passed ');
+      }  
+    });
 
   
   it("addFounders validation",async()=>{
     var founders = [accounts[5],accounts[6],accounts[7]];
     var tokens= [1001,10001,100001];   
 
-     try {
+    try {
       await sale.addFounders(founders,tokens);
     } catch(err) {
       assert(false, 'addFounders Failed');
@@ -116,5 +124,6 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
   });  
 
   it("next test", async () => {
+
   });
 });
