@@ -22,45 +22,44 @@ contract("Coupon Coin Token Sale Basic Test", (accounts) => {
     assert.equal(checkAddr, owner);
   }); 
 
-  it("Coupon Token Coin owner should be same with owner", async () => {
+  it("Coupon Token Coin owner should be same with contract owner", async () => {
     const tokenOwner = await token.owner();
     assert.equal(tokenOwner, owner);
   });
 
-  it("Coupon Token Coin Sale owner should be same with owner", async () => {
+  it("Coupon Token Coin Sale owner should be same with contract owner", async () => {
     const saleOwner = await sale.owner();
     assert.equal(saleOwner, owner);
   });   
+});
 
-  it("transferEnabled should change after calling enableTransfer/disableTransfer",
-    async () => {
-    let transferFlag;
-    transferFlag = await token.transferEnabled();
-    assert.equal(transferFlag, false);
+contract("Coupon Coin Token Start Sale Test", (accounts) => {
 
-    await token.enableTransfer({ from: owner });
-    transferFlag = await token.transferEnabled();
-    assert.equal(transferFlag, true);
+  const owner = accounts[0];
+  const admin = accounts[1];
+  const fund = accounts[2];
+  const user = accounts[3];
 
-    await token.disableTransfer({ from: owner });
-    transferFlag = await token.transferEnabled();
-    assert.equal(transferFlag, false);
+  let token = null;
+  let sale = null
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner }
+    );
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[2],accounts[3],accounts[4]);   
   });
 
-  it("only owner can call enableTransfer", async () => {
+  it("Start sale should have eth rate.",async()=>{
     try {
-      await token.enableTransfer({ from: user });
-      assert(false);
+      await sale.startSale();
+      throw(1);
     } catch(err) {
-      assert(err);
-    }
+      if(err==1)
+        assert(false, 'startSale successful, Eth to Cents conversion not handled');
+    }  
 
-    try {
-      await token.enableTransfer({ from: admin });
-      assert(false);
-    } catch(err) {
-      assert(err);
-    }
   });
 });
 
@@ -118,8 +117,6 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
       assert(false, 'addFounders Failed');
     }   
   });  
-
-  it("next test", async () => {
-
-  });
 });
+
+
