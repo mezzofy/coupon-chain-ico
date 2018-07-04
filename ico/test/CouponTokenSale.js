@@ -91,8 +91,6 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
     } catch(err) {
       if(err==1)
         assert(false, 'addFounders successful, Owner/Fund/Treasury/Contigency address validation not handled');
-      else
-        assert(true, 'addFounders Failed, test passed ');
     }   
   });
 
@@ -106,8 +104,6 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
       } catch(err) {
         if(err==1)
           assert(false, 'addFounders successful, Founder limit not handled');
-        else
-          assert(true, 'addFounders Failed, test passed ');
       }  
     });
 
