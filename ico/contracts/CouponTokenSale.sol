@@ -34,6 +34,12 @@ contract CouponTokenSale is Pausable {
     // Amount of raised in Wei (1 ether)
     uint256 public totalWeiRaised;
 
+    // Compaigns Tokens
+    uint256 public issuedAirDropTokens;
+    uint256 public issuedBountyTokens;
+    uint256 public issuedCouponTokens;
+    uint256 public issuedReferralTokens;
+
     /*
      *
      * C O N S T A N T S
@@ -488,6 +494,25 @@ contract CouponTokenSale is Pausable {
         } // end-of-outer loop
 
     } // end-of-function
+
+    function airDrop(address[] users, uint256 tokens) 
+        external 
+        onlyOwner
+        atStage(Stages.Started) {
+
+        uint256 totalTokens = users.length.mul(tokens);
+
+        require((MAX_CAP_AIRDROP_PROGRAM - issuedAirDropTokens) >= totalTokens);
+
+        for(uint16 i = 0; i < users.length; i++) {
+            // Transfer airDrop tokes from Treasury
+            couponToken.transferFrom(treasuryAddr, 
+                users[i], 
+                tokens);
+        }
+        // Add it as issue
+        issuedAirDropTokens = issuedAirDropTokens.add(totalTokens);
+    }
 
     // function TestFunc(uint256 inWei) public view
     //     returns (uint256) {
