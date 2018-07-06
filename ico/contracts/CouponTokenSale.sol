@@ -113,8 +113,8 @@ contract CouponTokenSale is Pausable {
     uint8 public currLot;
 
     struct BuyerInfoForPoolBonus {
-        address addr;
         uint256 noOfTokensBought;
+        bool bonusEligible;
         uint256 bonusTokensAlotted;
     }
 
@@ -125,7 +125,9 @@ contract CouponTokenSale is Pausable {
         uint256 poolBonus;
         uint256 soldTokens;
         uint256 totalCentsRaised;
-        BuyerInfoForPoolBonus[] buyerInfoForPoolBonus;
+        mapping(address => BuyerInfoForPoolBonus) buyerInfoForPoolBonus;
+        address[] buyersList;
+        uint256 cumulativeBonusTokens;
         bool poolBonusCalculated;
     }
 
@@ -413,7 +415,7 @@ contract CouponTokenSale is Pausable {
         returns (uint256) {
         
         // Find no.of tokens to be purchased
-        uint256 totalTokens = inCents.div(lotsInfo[currLot].rateInCents) * (10 ** uint256(decimals));
+        uint256 purchaseTokens = inCents.mul(10 ** uint256(decimals)).div(lotsInfo[currLot].rateInCents);
         
         // Check sufficient tokens available in this lot
         uint256 availableTokens = lotsInfo[currLot].totalTokens - lotsInfo[currLot].soldTokens;
@@ -423,12 +425,12 @@ contract CouponTokenSale is Pausable {
 
         // See if required token available in current lot, 
         // if not transfer the balance token from Treasury wallet
-        if(availableTokens < totalTokens) {
-            needToTakeFromTreasury = totalTokens - availableTokens;
+        if(availableTokens < purchaseTokens) {
+            needToTakeFromTreasury = purchaseTokens - availableTokens;
         }
 
         // Mint the required tokes
-        if (!couponToken.mint(purchaser, totalTokens)) {
+        if (!couponToken.mint(purchaser, purchaseTokens)) {
             revert();
         }
 
@@ -438,25 +440,30 @@ contract CouponTokenSale is Pausable {
         }
             
         // Add it to Lot Information
-        lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(totalTokens);
+        lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(purchaseTokens);
         lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
 
-        BuyerInfoForPoolBonus memory buyer = BuyerInfoForPoolBonus(purchaser, totalTokens, 0);
-        
-        // See the buyer already in list
-        for(uint i = 0; i < lotsInfo[currLot].buyerInfoForPoolBonus.length; i++) {
-            if(lotsInfo[currLot].buyerInfoForPoolBonus[i].addr == buyer.addr) {
-                lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought = 
-                    lotsInfo[currLot].buyerInfoForPoolBonus[i].noOfTokensBought.add(totalTokens);
-                break; // break the for-loop
-            }
+        // See if the buyer is already in our list, add it if not
+        uint256 oldTokens = lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought;
+        if(oldTokens == 0) {
+            lotsInfo[currLot].buyersList.push(purchaser);
         }
-        
-        if(i == lotsInfo[currLot].buyerInfoForPoolBonus.length) {
-            // Item not found in the array, so add it
-            lotsInfo[currLot].buyerInfoForPoolBonus.push(buyer);
+
+        // Add total tokens
+        lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought = 
+            lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought.add(purchaseTokens);
+
+        // Set bonusEligible as true total purchased units more than POOL_BONUS_ELIGIBLE
+        uint256 newTokens = lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought;
+        if(newTokens >= POOL_BONUS_ELIGIBLE) {
+            
+            lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].bonusEligible = true;
+
+            if(oldTokens < POOL_BONUS_ELIGIBLE)
+                lotsInfo[currLot].cumulativeBonusTokens = lotsInfo[currLot].cumulativeBonusTokens.add(newTokens);
+            else
+                lotsInfo[currLot].cumulativeBonusTokens = lotsInfo[currLot].cumulativeBonusTokens.add(purchaseTokens);
         }
-        
 
         // Check if the lot sale is completed
         if(lotsInfo[currLot].soldTokens >= lotsInfo[currLot].totalTokens) {
@@ -474,7 +481,7 @@ contract CouponTokenSale is Pausable {
             } 
         }
 
-        return totalTokens;
+        return purchaseTokens;
     }
 
 
@@ -490,38 +497,31 @@ contract CouponTokenSale is Pausable {
             // Continue the loop of Pool bonus calculated already
             if(lotsInfo[i].poolBonusCalculated == true) continue;
 
-            // Enumerate all users who bought more than POOL_BONUS_ELIGIBLE
-            uint256 eligibleBonusUnits;
-            for(uint256 j = 0; j < lotsInfo[i].buyerInfoForPoolBonus.length; j++) {
-                // Bonus eligible?
-                if(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought >= POOL_BONUS_ELIGIBLE)
-                    eligibleBonusUnits = 
-                        eligibleBonusUnits.add(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE));
-            }
+            // contine the loop if nothing to calculate
+            if(lotsInfo[i].cumulativeBonusTokens == 0) 
+                continue;
 
-            uint256 bonusShare;
-            if(eligibleBonusUnits > 0) {
-                // Calculate bonus
-                bonusShare = lotsInfo[i].poolBonus.div(eligibleBonusUnits);
-            }
-
+            uint256 bonusPercent;
             // Enumerate and allot bonus
-            for(j = 0; j < lotsInfo[i].buyerInfoForPoolBonus.length; j++) {
+            for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
+
+                address addr = lotsInfo[i].buyersList[j];
+                BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfoForPoolBonus[addr];
+                
                 // Bonus eligible?
-                if(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought >= POOL_BONUS_ELIGIBLE) {
+                if(buyerInfo.bonusEligible) {
                     
+                    bonusPercent = buyerInfo.noOfTokensBought.div(lotsInfo[i].cumulativeBonusTokens);
                     // Allot bonus tokens                    
-                    lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted = 
-                        lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE).mul(bonusShare);
+                    buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(bonusPercent);
                     
                     // Mint the required tokes
-                    if (!couponToken.mint(lotsInfo[i].buyerInfoForPoolBonus[j].addr, 
-                        lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted)) {
+                    if (!couponToken.mint(addr, buyerInfo.bonusTokensAlotted)) {
                         revert();
                     }       
 
                     // Subtract it from tokensTreasury a/c
-                    remainingTreasuryTokens = remainingTreasuryTokens.sub(lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted);
+                    remainingTreasuryTokens = remainingTreasuryTokens.sub(buyerInfo.bonusTokensAlotted);
                 }           
             }
 
@@ -543,13 +543,16 @@ contract CouponTokenSale is Pausable {
         onlyOwner
         atStage(Stages.Started) {
 
+        require(users.length > 0 && tokens > 0);
+
         uint256 totalTokens = users.length.mul(tokens);
 
         require(remainingAirDropTokens >= totalTokens);
 
         for(uint16 i = 0; i < users.length; i++) {
-            // Transfer airDrop tokes from Treasury
-            couponToken.transferFrom(treasuryAddr, users[i], tokens);
+
+            // Founders address should validate following
+            require(users[i] != address(0) && users[i] != fundAddr && users[i] != treasuryAddr && users[i] != contigencyAddr);
 
              // Mint the required tokes
             if (!couponToken.mint(users[i], tokens)) {
