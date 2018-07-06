@@ -34,11 +34,14 @@ contract CouponTokenSale is Pausable {
     // Amount of raised in Wei (1 ether)
     uint256 public totalWeiRaised;
 
+    // TreasuryTokens
+    uint256 public remainingTreasuryTokens;
+
     // Compaigns Tokens
-    uint256 public issuedAirDropTokens;
-    uint256 public issuedBountyTokens;
-    uint256 public issuedCouponTokens;
-    uint256 public issuedReferralTokens;
+    uint256 public remainingAirDropTokens;
+    uint256 public remainingBountyTokens;
+    uint256 public remainingCouponTokens;
+    uint256 public remainingdReferralTokens;
 
     /*
      *
@@ -50,8 +53,8 @@ contract CouponTokenSale is Pausable {
     // Total coupon supply, 1 billion
     uint256 public constant TOTAL_COUPON_SUPPLY = 1000000000 * (10 ** uint256(decimals)); // 1 billion
     
-    // Coupon Sale Allowance for Crowd Sales, 500 million
-    uint256 public constant TOKEN_SALE_ALLOWANCE =  500000000 * (10 ** uint256(decimals)); // 500 million
+    // Coupon Sale Allowance for Crowd Sales, 300 million
+    uint256 public constant TOKEN_SALE_ALLOWANCE =  300000000 * (10 ** uint256(decimals)); // 300 million
     
     // Maximum CAP for founders, 100 million
     uint256 public constant MAX_CAP_FOR_FOUNDERS = 100000000 * (10 ** uint256(decimals)); // 100 million
@@ -125,6 +128,26 @@ contract CouponTokenSale is Pausable {
         BuyerInfoForPoolBonus[] buyerInfoForPoolBonus;
         bool poolBonusCalculated;
     }
+
+    struct UserInfoForCampaign {
+        address addr;
+        uint256 bonusTokensAlotted;
+    }
+
+    struct EventData {
+        uint32 idEvent;
+        uint256 tokensForEvent;
+        bool activated;
+        bool killed;
+        UserInfoForCampaign[] userInfoForCampaign;
+    }
+
+    // Event Data for Bounty Program
+    EventData[] public bountyProgram;
+
+    // Event-data for Coupon Bonus Program
+    EventData[] public couponProgram;
+
 
     // List of Lots information
     mapping(uint8 => LotInfos) public lotsInfo;
@@ -202,6 +225,15 @@ contract CouponTokenSale is Pausable {
         lotsInfo[SALE_LOT4].rateInCents = RATE_FOR_LOT4;
         lotsInfo[SALE_LOT4].poolBonus = POOL_BONUS_LOT4;
 
+        // Initialize
+        remainingTreasuryTokens = MAX_CAP_FOR_TREASURY;
+
+        // Initialize Campaign bonus values
+        remainingAirDropTokens = MAX_CAP_AIRDROP_PROGRAM;
+        remainingBountyTokens = MAX_CAP_BOUNTY_PROGRAM;
+        remainingCouponTokens = MAX_CAP_COUPON_PROGRAM;
+        remainingdReferralTokens = MAX_CAP_REFERRAL_PROGRAM;
+
     }
 
     /*
@@ -236,11 +268,12 @@ contract CouponTokenSale is Pausable {
         treasuryAddr = _treasuryAddr;
         contigencyAddr = _contigencyAddr;
 
+        /* DON'T DO IT HERE, will do it in end-sale
         // Allocate tokens for treasury
         if (!couponToken.mint(treasuryAddr, MAX_CAP_FOR_TREASURY)) {
             revert();
         }
-
+        */
         // Allocate tokens for contigency
         if (!couponToken.mint(contigencyAddr, MAX_CAP_FOR_CONTIGENCY)) {
             revert();
@@ -269,7 +302,7 @@ contract CouponTokenSale is Pausable {
             totalFounderAllocation = totalFounderAllocation.add(Tokens[i]);
 
             // Founders address should validate following
-            require(Users[i] != address(0) && Users[i] != fundAddr && Users[i] != treasuryAddr && Users[i] != contigencyAddr);
+            require(Users[i] != address(0) && Users[i] != fundAddr && Users[i] != treasuryAddr && Users[i] != contigencyAddr && Tokens[i] > 0);
         }
         
         // Total tokens should be more than CAP
@@ -321,9 +354,20 @@ contract CouponTokenSale is Pausable {
      /*
      * End sale
      */
-    function endSale() private {
-        endSaleTime = now;
-        stage = Stages.Ended;
+    function endSale() 
+        external
+        onlyOwner {
+
+        // Transfer balance tokens to treasury
+        if (!couponToken.mint(treasuryAddr, remainingTreasuryTokens)) {
+            revert();
+        } 
+
+        // Check if sale already end by purchase
+        if(stage == Stages.Started) {
+            endSaleTime = now;
+            stage = Stages.Ended;
+        }
     }
 
     /*
@@ -374,33 +418,27 @@ contract CouponTokenSale is Pausable {
         // Check sufficient tokens available in this lot
         uint256 availableTokens = lotsInfo[currLot].totalTokens - lotsInfo[currLot].soldTokens;
 
-        uint256 purchaseToken;
         uint256 needToTakeFromTreasury = 0;
         
 
         // See if required token available in current lot, 
         // if not transfer the balance token from Treasury wallet
-        if(availableTokens >= totalTokens) {
-            purchaseToken = totalTokens;
-        } else {
-            purchaseToken = availableTokens;
+        if(availableTokens < totalTokens) {
             needToTakeFromTreasury = totalTokens - availableTokens;
         }
 
         // Mint the required tokes
-        if (!couponToken.mint(purchaser, purchaseToken)) {
+        if (!couponToken.mint(purchaser, totalTokens)) {
             revert();
         }
 
         // Transfer from Treasury if needed
         if(needToTakeFromTreasury > 0) {
-            if (!couponToken.transferFrom(treasuryAddr, purchaser, needToTakeFromTreasury)) {
-                revert();
-            }
+            remainingTreasuryTokens = remainingTreasuryTokens.sub(needToTakeFromTreasury);
         }
             
         // Add it to Lot Information
-        lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(purchaseToken + needToTakeFromTreasury);
+        lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(totalTokens);
         lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
 
         BuyerInfoForPoolBonus memory buyer = BuyerInfoForPoolBonus(purchaser, totalTokens, 0);
@@ -431,7 +469,8 @@ contract CouponTokenSale is Pausable {
 
             if(currLot == MAX_SALE_LOTS) {
                 // All sale lots completed, so end the sale
-                endSale();
+                endSaleTime = now;
+                stage = Stages.Ended;
             } 
         }
 
@@ -460,31 +499,29 @@ contract CouponTokenSale is Pausable {
                         eligibleBonusUnits.add(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE));
             }
 
+            uint256 bonusShare;
             if(eligibleBonusUnits > 0) {
                 // Calculate bonus
-                uint256 bonusShare;
-                if(i == SALE_LOT1)
-                    bonusShare = POOL_BONUS_LOT1.div(eligibleBonusUnits);
-                else if(i == SALE_LOT2)
-                    bonusShare = POOL_BONUS_LOT2.div(eligibleBonusUnits);
-                else if(i == SALE_LOT3)
-                    bonusShare = POOL_BONUS_LOT3.div(eligibleBonusUnits);
-                else if(i == SALE_LOT4)
-                    bonusShare = POOL_BONUS_LOT4.div(eligibleBonusUnits);
+                bonusShare = lotsInfo[i].poolBonus.div(eligibleBonusUnits);
             }
 
             // Enumerate and allot bonus
             for(j = 0; j < lotsInfo[i].buyerInfoForPoolBonus.length; j++) {
                 // Bonus eligible?
                 if(lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought >= POOL_BONUS_ELIGIBLE) {
+                    
                     // Allot bonus tokens                    
                     lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted = 
                         lotsInfo[i].buyerInfoForPoolBonus[j].noOfTokensBought.div(POOL_BONUS_ELIGIBLE).mul(bonusShare);
                     
-                    //Transfer Bonus from Treasury
-                    couponToken.transferFrom(treasuryAddr, 
-                        lotsInfo[i].buyerInfoForPoolBonus[j].addr, 
-                        lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted);
+                    // Mint the required tokes
+                    if (!couponToken.mint(lotsInfo[i].buyerInfoForPoolBonus[j].addr, 
+                        lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted)) {
+                        revert();
+                    }       
+
+                    // Subtract it from tokensTreasury a/c
+                    remainingTreasuryTokens = remainingTreasuryTokens.sub(lotsInfo[i].buyerInfoForPoolBonus[j].bonusTokensAlotted);
                 }           
             }
 
@@ -495,6 +532,12 @@ contract CouponTokenSale is Pausable {
 
     } // end-of-function
 
+
+    /*
+     *
+     * Function: airDrop()
+     *
+    */
     function airDrop(address[] users, uint256 tokens) 
         external 
         onlyOwner
@@ -502,17 +545,110 @@ contract CouponTokenSale is Pausable {
 
         uint256 totalTokens = users.length.mul(tokens);
 
-        require((MAX_CAP_AIRDROP_PROGRAM - issuedAirDropTokens) >= totalTokens);
+        require(remainingAirDropTokens >= totalTokens);
 
         for(uint16 i = 0; i < users.length; i++) {
             // Transfer airDrop tokes from Treasury
-            couponToken.transferFrom(treasuryAddr, 
-                users[i], 
-                tokens);
+            couponToken.transferFrom(treasuryAddr, users[i], tokens);
+
+             // Mint the required tokes
+            if (!couponToken.mint(users[i], tokens)) {
+                revert();
+            }       
         }
-        // Add it as issue
-        issuedAirDropTokens = issuedAirDropTokens.add(totalTokens);
+        // Subtract it from the Remaining tokens
+        remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
+
+        // Subtract it from tokensTreasury a/c as well.
+        remainingTreasuryTokens = remainingTreasuryTokens.sub(totalTokens);
     }
+
+    /*
+     *
+     * Function: createBounty()
+     *
+    */
+    function createBounty(uint256 noOfBountyTokens)
+        external view
+        onlyOwner
+        atStage(Stages.Started) 
+        returns (uint32) {
+
+        // Contition
+        require(remainingBountyTokens >= noOfBountyTokens);
+
+        // Generate new event id
+        uint32 newEventId = uint32(bountyProgram.length);
+
+        // // Create event data
+        // EventData memory eventData;// = EventData({idEvent: newEventId, tokenForEvent: noOfBountyTokens});
+        // eventData.idEvent = newEventId;
+        // eventData.tokensForEvent = noOfBountyTokens;
+
+        // // Add it to array
+        // bountyProgram.push(eventData);
+
+        return newEventId;
+    }
+
+    /*
+     *
+     * Function: killBounty()
+     *
+    */
+    function killBounty(uint32 bountyId)
+        external
+        onlyOwner
+        atStage(Stages.Started) 
+        returns (uint32) {
+        
+        require(bountyId < bountyProgram.length && 
+            bountyProgram[bountyId].killed == false);
+
+        bountyProgram[bountyId].killed = true;
+
+    }
+
+    /*
+     *
+     * Function: activateBounty()
+     *
+    */
+    function activateBounty(uint32 bountyId)
+        external
+        onlyOwner
+        atStage(Stages.Started) {
+
+        require(bountyId < bountyProgram.length && 
+            bountyProgram[bountyId].activated == false && 
+            bountyProgram[bountyId].killed == false);
+
+        bountyProgram[bountyId].activated = true;
+    }
+
+    /*
+     *
+     * Function: activateBounty()
+     *
+    */
+    function participateBounty(uint32 bountyId, address user)
+        external 
+        onlyOwner
+        atStage(Stages.Started) {
+
+        require(bountyId < bountyProgram.length && 
+        bountyProgram[bountyId].activated == true && 
+            bountyProgram[bountyId].killed == false);
+
+        UserInfoForCampaign memory userInfo = UserInfoForCampaign(user, 0);
+
+        bountyProgram[bountyId].userInfoForCampaign.push(userInfo);
+
+    }
+    
+
+
+
 
     // function TestFunc(uint256 inWei) public view
     //     returns (uint256) {
