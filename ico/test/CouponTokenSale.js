@@ -33,7 +33,7 @@ contract("Coupon Coin Token Sale Basic Test", (accounts) => {
   });   
 });
 
-contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
+contract("Coupon Coin Token addFounders Test", (accounts) => {
   const owner = accounts[0];
   const admin = accounts[1];
   const fund = accounts[2];
@@ -44,8 +44,7 @@ contract("Coupon Coin Token Founder Allocation Test", (accounts) => {
 
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
-    sale = await CCTCoinSale.new( token.address, { from: owner }
-    );
+    sale = await CCTCoinSale.new( token.address, { from: owner });
     await token.setCouponTokenSale(sale.address);
     await sale.setupContract(accounts[2],accounts[3],accounts[4]);   
   });
@@ -181,7 +180,7 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
 });
 
 
-contract("Coupon Coin Token buyFiat Test",(accounts)=>{
+contract("Coupon Coin Token buyFiat & calculatePoolBonus Test",(accounts)=>{
 
   const owner = accounts[0];
   const admin = accounts[1];
@@ -194,13 +193,13 @@ contract("Coupon Coin Token buyFiat Test",(accounts)=>{
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
     sale = await CCTCoinSale.new( token.address, { from: owner }
+
     );
     await token.setCouponTokenSale(sale.address);
     await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
     await sale.setEth2Cents(45000);
     await sale.startSale();
   });
-
 
   it('buyFiat validation',async()=>{
     var buyer = accounts[5];
@@ -212,10 +211,74 @@ contract("Coupon Coin Token buyFiat Test",(accounts)=>{
           assert(false, 'buyFiat Failed.');
     }   
 
-    //uint256 totalTokens = inCents.div(lotsInfo[currLot].rateInCents) * (10 ** uint256(decimals));
     var tokenbalance=await token.balanceOf(accounts[5]);
-    console.log('Tokens:',tokenbalance.toNumber());
-    //if(tokenbalance != tokens)
-      //assert(false,'airDrop successfully done. But tokens not available into users.')
+    if(tokenbalance == 0)
+      assert(false,'buyFiat Failed. But tokens not available into users.')
   });
+
+  it('buyFiat should take unavailable tokens from treasury account if Lot tokens exceeds.',async()=>{
+    var buyer1 = accounts[5];
+    var buyer2 = accounts[6];
+    var buyer3 = accounts[7];
+
+    var cents1= 6 * 15000000; 
+    var cents2= 6 * 10000000; 
+    var cents3= 6 *  6000000; 
+
+    var TreasuryTotalTokens = 500000000;
+    //Lot 1  30000000
+  
+    try {
+      await sale.buyFiat(buyer1,cents1);
+      await sale.buyFiat(buyer2,cents2);
+      await sale.buyFiat(buyer3,cents3);
+      } catch(err) {
+          assert(false, 'buyFiat Failed.');
+    }   
+
+    var treasuryremaining = await sale.remainingTreasuryTokens();
+    if(TreasuryTotalTokens == treasuryremaining)
+      assert(false,'buyFiat error.exceeding lot tokens not handled properly.')
+  });
+
+
+  it('buyFiat should allocate poolbonus for lot users',async()=>{
+    var buyer1 = accounts[5];
+    var buyer2 = accounts[6];
+    var buyer3 = accounts[7];
+
+    //30000000
+    var cents1= 6 * 15000000; 
+    var cents2= 6 * 10000000; 
+    var cents3= 6 *  6000000; 
+
+    var poolBonusforLot1 = 3000000;
+    var TreasuryTotalTokens = 500000000;
+    //Lot 1  30000000
+    //Consider bonus for a user is 1000000,if the total user is 3 
+  
+    try {
+      await sale.buyFiat(buyer1,cents1);
+      await sale.buyFiat(buyer2,cents2);
+      await sale.buyFiat(buyer3,cents3);
+      } catch(err) {
+          assert(false, 'buyFiat Failed.');
+    }   
+
+    var tokenbalance=await token.balanceOf(accounts[5]);
+    //console.log('User5 Tokens Before Bonus:',tokenbalance.toNumber()/(10**18))
+    
+    try{
+      await sale.calculatePoolBonus();
+    }catch(err){
+      assert(false,'calculatePoolBonus Failed.');
+    }
+
+    var tokenbalanceAfterPoolBonus=await token.balanceOf(accounts[5]);
+    if(tokenbalance == tokenbalanceAfterPoolBonus)
+        assert(false,'buyFiat error.calculatePoolBonus not handled properly.')
+    //console.log('User5 Tokens After  Bonus:',tokenbalance1.toNumber()/(10**18))
+    
+  });
+
 });
