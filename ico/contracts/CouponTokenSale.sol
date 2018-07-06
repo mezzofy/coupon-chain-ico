@@ -16,6 +16,9 @@ contract CouponTokenSale is Pausable {
     // End time of Sale
     uint256 public endSaleTime;
 
+    // Flag to mark endSales
+    bool private endSalesFlag;
+
 
     uint256 private rateEth2Cents;
 
@@ -41,7 +44,7 @@ contract CouponTokenSale is Pausable {
     uint256 public remainingAirDropTokens;
     uint256 public remainingBountyTokens;
     uint256 public remainingCouponTokens;
-    uint256 public remainingdReferralTokens;
+    uint256 public remainingReferralTokens;
 
     /*
      *
@@ -236,7 +239,7 @@ contract CouponTokenSale is Pausable {
         remainingAirDropTokens = MAX_CAP_AIRDROP_PROGRAM;
         remainingBountyTokens = MAX_CAP_BOUNTY_PROGRAM;
         remainingCouponTokens = MAX_CAP_COUPON_PROGRAM;
-        remainingdReferralTokens = MAX_CAP_REFERRAL_PROGRAM;
+        remainingReferralTokens = MAX_CAP_REFERRAL_PROGRAM;
 
     }
 
@@ -272,17 +275,6 @@ contract CouponTokenSale is Pausable {
         treasuryAddr = _treasuryAddr;
         contigencyAddr = _contigencyAddr;
 
-        /* DON'T DO IT HERE, will do it in end-sale
-        // Allocate tokens for treasury
-        if (!couponToken.mint(treasuryAddr, MAX_CAP_FOR_TREASURY)) {
-            revert();
-        }
-        */
-        // Allocate tokens for contigency
-        if (!couponToken.mint(contigencyAddr, MAX_CAP_FOR_CONTIGENCY)) {
-            revert();
-        }
-
         // Change the Stage as Setup
         stage = Stages.Setup;
 
@@ -317,10 +309,8 @@ contract CouponTokenSale is Pausable {
             // Assign tokens
             founders[Users[i]] = Tokens[i];
 
-            // Mint the required token
-            if (!couponToken.mint(Users[i], Tokens[i])) {
-                revert();
-            }
+            // Mint the required tokens
+            couponToken.mint(Users[i], Tokens[i]);
         }
     }
 
@@ -362,16 +352,30 @@ contract CouponTokenSale is Pausable {
         external
         onlyOwner {
 
-        // Transfer balance tokens to treasury
-        if (!couponToken.mint(treasuryAddr, remainingTreasuryTokens)) {
-            revert();
-        } 
+        // Flag to prevent the second call of this function
+        require(endSalesFlag == false);
+
+        // Allocate tokens for contigency
+        couponToken.mint(contigencyAddr, MAX_CAP_FOR_CONTIGENCY);
+
+        // Calculate remaing balance for Treasury
+        uint256 treasuryTokens = remainingTreasuryTokens - 
+            (POOL_BONUS_LOT1 + POOL_BONUS_LOT2 + POOL_BONUS_LOT3 + POOL_BONUS_LOT4) -
+            (MAX_CAP_AIRDROP_PROGRAM - remainingAirDropTokens) - 
+            (MAX_CAP_BOUNTY_PROGRAM - remainingBountyTokens) -
+            (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens) -
+            (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
+
+        // mint the balance to Treasury wallet
+        couponToken.mint(treasuryAddr, treasuryTokens);
 
         // Check if sale already end by purchase
         if(stage == Stages.Started) {
             endSaleTime = now;
             stage = Stages.Ended;
         }
+
+        endSalesFlag = true;
     }
 
     /*
@@ -431,10 +435,8 @@ contract CouponTokenSale is Pausable {
             needToTakeFromTreasury = purchaseTokens - availableTokens;
         }
 
-        // Mint the required tokes
-        if (!couponToken.mint(purchaser, purchaseTokens)) {
-            revert();
-        }
+        // Mint the required tokens
+        couponToken.mint(purchaser, purchaseTokens);
 
         // Transfer from Treasury if needed
         if(needToTakeFromTreasury > 0) {
@@ -489,14 +491,14 @@ contract CouponTokenSale is Pausable {
 
             // Check whether 5% referral bonus availabe?
             uint256 referralTokensNeeded = purchaseTokens * 5 / 100;    // 5%
-            if(remainingdReferralTokens >= referralTokensNeeded) {
+            if(remainingReferralTokens >= referralTokensNeeded) {
                 // 4% to referree and 1% to purchaser
                 couponToken.mint(referrals[purchaser], (purchaseTokens * 4 / 100));
-                couponToken.mint(referrals[purchaser], (purchaseTokens * 1 / 100));
+                couponToken.mint(purchaser, (purchaseTokens * 1 / 100));
             }
 
             // Decrease the total
-            remainingdReferralTokens = remainingdReferralTokens.sub(referralTokensNeeded);
+            remainingReferralTokens = remainingReferralTokens.sub(referralTokensNeeded);
         }
 
         return purchaseTokens;
@@ -532,13 +534,8 @@ contract CouponTokenSale is Pausable {
                     // Allot bonus tokens                    
                     buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
                     
-                    // Mint the required tokes
-                    if (!couponToken.mint(addr, buyerInfo.bonusTokensAlotted)) {
-                        revert();
-                    }       
-
-                    // Subtract it from tokensTreasury a/c
-                    remainingTreasuryTokens = remainingTreasuryTokens.sub(buyerInfo.bonusTokensAlotted);
+                    // Mint the required tokens
+                    couponToken.mint(addr, buyerInfo.bonusTokensAlotted);
                 }           
             }
 
@@ -571,16 +568,11 @@ contract CouponTokenSale is Pausable {
             // Founders address should validate following
             require(users[i] != address(0) && users[i] != fundAddr && users[i] != treasuryAddr && users[i] != contigencyAddr);
 
-             // Mint the required tokes
-            if (!couponToken.mint(users[i], tokens)) {
-                revert();
-            }       
+             // Mint the required tokens
+            couponToken.mint(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
-
-        // Subtract it from tokensTreasury a/c as well.
-        remainingTreasuryTokens = remainingTreasuryTokens.sub(totalTokens);
     }
 
     /*
@@ -660,7 +652,7 @@ contract CouponTokenSale is Pausable {
         require(remainingBountyTokens >= bountyProgram[bountyId].tokensForEvent);
 
         require(
-            bountyId < bountyProgram.length && 
+            bountyId < bountyProgram.length &&
             bountyProgram[bountyId].activated == true && 
             bountyProgram[bountyId].killed == false);
 
@@ -697,16 +689,11 @@ contract CouponTokenSale is Pausable {
 
         uint256 bountyTokens = bountyProgram[bountyId].tokensForEvent;
 
-         // Mint the required tokes
-        if (!couponToken.mint(user, bountyTokens)) {
-            revert();
-        } 
+         // Mint the required tokens
+        couponToken.mint(user, bountyTokens);
 
         // Subtract it from the Remaining tokens
         remainingBountyTokens = remainingBountyTokens.sub(bountyTokens);
-
-        // Subtract it from tokensTreasury a/c as well.
-        remainingTreasuryTokens = remainingTreasuryTokens.sub(bountyTokens);
 
         bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
     }
@@ -824,16 +811,11 @@ contract CouponTokenSale is Pausable {
 
         uint256 bountyTokens = couponProgram[couponId].tokensForEvent;
 
-         // Mint the required tokes
-        if (!couponToken.mint(user, bountyTokens)) {
-            revert();
-        } 
+        // Mint the required tokens
+        couponToken.mint(user, bountyTokens);
 
         // Subtract it from the Remaining tokens
         remainingBountyTokens = remainingBountyTokens.sub(bountyTokens);
-
-        // Subtract it from tokensTreasury a/c as well.
-        remainingTreasuryTokens = remainingTreasuryTokens.sub(bountyTokens);
 
         couponProgram[couponId].userInfoForCampaign[user].fullfillmentDone == true;
     }
@@ -847,6 +829,8 @@ contract CouponTokenSale is Pausable {
         external
         onlyOwner
         atStage(Stages.Started) {
+
+        require(user != address(0x0) && referredBy != address(0x0));
 
         require(referrals[user] == address(0x0));
 
@@ -872,4 +856,4 @@ contract CouponTokenSale is Pausable {
     //     return int8(a-b);
     // }
     
-} //** End of Contract
+}
