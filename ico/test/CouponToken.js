@@ -23,34 +23,5 @@ contract("CCT Coin Basic Test", (accounts) => {
       assert.equal(checkAddr, owner);
     });
   
-    it("transferEnabled should change after calling enableTransfer/disableTransfer",
-      async () => {
-      let transferFlag;
-      transferFlag = await token.transferEnabled();
-      assert.equal(transferFlag, false);
-  
-      await token.enableTransfer({ from: owner });
-      transferFlag = await token.transferEnabled();
-      assert.equal(transferFlag, true);
-  
-      await token.disableTransfer({ from: owner });
-      transferFlag = await token.transferEnabled();
-      assert.equal(transferFlag, false);
-    });
-  
-    it("only owner can call enableTransfer", async () => {
-      try {
-        await token.enableTransfer({ from: user });
-        assert(false);
-      } catch(err) {
-        assert(err);
-      }
-  
-      try {
-        await token.enableTransfer({ from: admin });
-        assert(false);
-      } catch(err) {
-        assert(err);
-      }
-    });
+ 
   });
