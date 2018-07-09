@@ -282,3 +282,69 @@ contract("Coupon Coin Token buyFiat & calculatePoolBonus Test",(accounts)=>{
   });
 
 });
+
+contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
+
+  const owner = accounts[0];
+  
+  let token = null;
+  let userToken = null;
+  let sale = null;
+  let userSale = null;
+
+  var buyer1 = accounts[4];
+  var buyer2 = accounts[5];
+  var buyer3 = accounts[6];
+  var buyer4 = accounts[7];
+
+  var cents1= 6 * 30000000; // 30 million
+  var cents2= 7 * 60000000; // 60 million
+  var cents3= 8 * 90000000; // 90 million
+  var cents4= 9 *120000000; // 120 million  
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[1],accounts[2],accounts[3]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();    
+
+    userToken = await CCTCoin.new({from: buyer4 });
+    //userSale = await CCTCoinSale.new( userToken.address, { from: buyer4 });
+    //await userToken.setCouponTokenSale(userSale.address);
+    
+  });
+
+  it('transfer tokens from users test',async()=>{
+ 
+    try {
+      
+      await sale.buyFiat(buyer1,cents1);
+      var tknBalanceOf4=await token.balanceOf(buyer1);
+      console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer2,cents2);
+      var tknBalanceOf5=await token.balanceOf(buyer2);
+      console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer3,cents3);
+      var tknBalanceOf6=await token.balanceOf(buyer3);
+      console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer4,cents4);
+      var tknBalanceOf7=await token.balanceOf(buyer4);
+      console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+      
+      await sale.endSale();
+      console.log('Sales ended.'); 
+
+      await userToken.transferFrom(buyer4,buyer2,1000);
+
+      } catch(err) {
+          assert(false, 'users transfer Failed.');
+    }   
+
+  });
+
+});
