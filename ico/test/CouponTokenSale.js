@@ -85,7 +85,7 @@ contract("Coupon Coin Token addFounders Test", (accounts) => {
       } catch(error){
         if(error==1)
         {
-           var tokenbalance=await token.balanceOf(accounts[5]);
+          var tokenbalance=await token.balanceOf(accounts[5]);
           console.log('Tokens:' ,tokenbalance.toNumber());
           if(tokenbalance.toNumber() <=0)
           {

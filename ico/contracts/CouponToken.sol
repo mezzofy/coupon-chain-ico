@@ -32,9 +32,12 @@ contract CouponToken is StandardToken, Ownable {
     }
 
     modifier onlyIfFounderVestingPeriodComplete(address sender) {
-        if(couponSaleAddr.founders(sender) > 0) {
-            require(now >= couponSaleAddr.endSaleTime() + (2 * 365 days));
-        }
+        require(couponSaleAddr.IsFounderVestingPeriodOver(sender) == true);
+        _;
+    }
+
+    modifier onlyIfUserVestingPeriodComplete(address sender) {
+        require(couponSaleAddr.IsUserVestingPeriodOver(sender) == true);
         _;
     }
 
@@ -69,8 +72,8 @@ contract CouponToken is StandardToken, Ownable {
     function transfer(address to, uint256 value)
         public
         onlyIfFounderVestingPeriodComplete(msg.sender)
-        returns (bool)
-    {
+        onlyIfUserVestingPeriodComplete(msg.sender)
+        returns (bool) {
         return super.transfer(to, value);
     }
 
@@ -84,6 +87,7 @@ contract CouponToken is StandardToken, Ownable {
     function transferFrom(address from, address to, uint256 value)
         public
         onlyIfFounderVestingPeriodComplete(from)
+        onlyIfUserVestingPeriodComplete(from)
         returns (bool)
     {
         return super.transferFrom(from, to, value);

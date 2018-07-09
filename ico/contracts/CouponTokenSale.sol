@@ -38,13 +38,13 @@ contract CouponTokenSale is Pausable {
     uint256 public totalWeiRaised;
 
     // TreasuryTokens
-    uint256 public remainingTreasuryTokens;
+    uint256 remainingTreasuryTokens;
 
     // Compaigns Tokens
-    uint256 public remainingAirDropTokens;
-    uint256 public remainingBountyTokens;
-    uint256 public remainingCouponTokens;
-    uint256 public remainingReferralTokens;
+    uint256 remainingAirDropTokens;
+    uint256 remainingBountyTokens;
+    uint256 remainingCouponTokens;
+    uint256 remainingReferralTokens;
 
     /*
      *
@@ -87,11 +87,11 @@ contract CouponTokenSale is Pausable {
     uint256 constant POOL_BONUS_LOT4 = 12000000 * (10 ** uint256(decimals)); // 12 million
 
     // Constants for lot sales related
-    uint8 constant public MAX_SALE_LOTS = 4;
-    uint8 constant public SALE_LOT1 = 0;
-    uint8 constant public SALE_LOT2 = 1;
-    uint8 constant public SALE_LOT3 = 2;
-    uint8 constant public SALE_LOT4 = 3;
+    uint8 constant MAX_SALE_LOTS = 4;
+    uint8 constant SALE_LOT1 = 0;
+    uint8 constant SALE_LOT2 = 1;
+    uint8 constant SALE_LOT3 = 2;
+    uint8 constant SALE_LOT4 = 3;
 
     uint256 constant POOL_BONUS_ELIGIBLE = 50000 * (10 ** uint256(decimals)); // 50 thousand
 
@@ -128,7 +128,7 @@ contract CouponTokenSale is Pausable {
         uint256 poolBonus;
         uint256 soldTokens;
         uint256 totalCentsRaised;
-        mapping(address => BuyerInfoForPoolBonus) buyerInfoForPoolBonus;
+        mapping(address => BuyerInfoForPoolBonus) buyerInfo;
         address[] buyersList;
         uint256 cumulativeBonusTokens;
         bool poolBonusCalculated;
@@ -147,21 +147,23 @@ contract CouponTokenSale is Pausable {
         mapping (address => UserInfoForCampaign) userInfoForCampaign;
     }
 
+    
     // Event Data for Bounty Program
-    EventData[] public bountyProgram;
+    uint32 bountyIndex;
+    mapping(uint32 => EventData) bountyProgram;
 
     // Event-data for Coupon Bonus Program
-    EventData[] public couponProgram;
+    uint32 couponIndex;
+    mapping(uint32 => EventData) couponProgram;
 
     // Mappings for Referrals
     mapping(address => address) referrals;
 
     // List of Lots information
-    mapping(uint8 => LotInfos) public lotsInfo;
-
+    mapping(uint8 => LotInfos) lotsInfo;
 
      // List for Founders
-    mapping(address => uint256) public founders;
+    mapping(address => uint256) founders;
 
     /*
      * Events
@@ -184,6 +186,11 @@ contract CouponTokenSale is Pausable {
      */
     event TokenPurchase(address indexed purchaser, uint256 value, uint256 amount);
 
+
+    event BountyCreated(uint32 newBountyId);
+
+    event CouponCreated(uint32 newCouponId);
+
     /*
      * Modifiers
      */
@@ -199,6 +206,11 @@ contract CouponTokenSale is Pausable {
 
         require(purchaser != address(0));
 
+        _;
+    }
+
+    modifier onlyCallFromCouponToken {
+        require(msg.sender == address(couponToken));
         _;
     }
 
@@ -448,20 +460,20 @@ contract CouponTokenSale is Pausable {
         lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
 
         // See if the buyer is already in our list, add it if not
-        uint256 oldTokens = lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought;
+        uint256 oldTokens = lotsInfo[currLot].buyerInfo[purchaser].noOfTokensBought;
         if(oldTokens == 0) {
             lotsInfo[currLot].buyersList.push(purchaser);
         }
 
         // Add total tokens
-        lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought = 
-            lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought.add(purchaseTokens);
+        lotsInfo[currLot].buyerInfo[purchaser].noOfTokensBought = 
+            lotsInfo[currLot].buyerInfo[purchaser].noOfTokensBought.add(purchaseTokens);
 
         // Set bonusEligible as true total purchased units more than POOL_BONUS_ELIGIBLE
-        uint256 newTokens = lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].noOfTokensBought;
+        uint256 newTokens = lotsInfo[currLot].buyerInfo[purchaser].noOfTokensBought;
         if(newTokens >= POOL_BONUS_ELIGIBLE) {
             
-            lotsInfo[currLot].buyerInfoForPoolBonus[purchaser].bonusEligible = true;
+            lotsInfo[currLot].buyerInfo[purchaser].bonusEligible = true;
 
             if(oldTokens < POOL_BONUS_ELIGIBLE)
                 lotsInfo[currLot].cumulativeBonusTokens = lotsInfo[currLot].cumulativeBonusTokens.add(newTokens);
@@ -526,7 +538,7 @@ contract CouponTokenSale is Pausable {
             for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
 
                 address addr = lotsInfo[i].buyersList[j];
-                BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfoForPoolBonus[addr];
+                BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[addr];
                 
                 // Bonus eligible?
                 if(buyerInfo.bonusEligible) {
@@ -583,19 +595,18 @@ contract CouponTokenSale is Pausable {
     function createBounty(uint256 noOfTokens)
         external
         onlyOwner
-        atStage(Stages.Started) 
-        returns (uint32) {
+        atStage(Stages.Started) {
 
         // Condition
-        require(remainingBountyTokens >= noOfTokens);
+        require(noOfTokens > 0 && remainingBountyTokens >= noOfTokens);
 
         // Generate new event id
-        uint32 newEventId = uint32(bountyProgram.length);
+        uint32 newEventId = bountyIndex;
+        bountyIndex++;
 
-        bountyProgram.length++;
         bountyProgram[newEventId].tokensForEvent = noOfTokens;
 
-        return newEventId;
+        emit BountyCreated(newEventId);
     }
 
     /*
@@ -610,7 +621,7 @@ contract CouponTokenSale is Pausable {
         returns (uint32) {
         
         require(
-            bountyId < bountyProgram.length && 
+            bountyId < bountyIndex &&
             bountyProgram[bountyId].killed == false);
 
         bountyProgram[bountyId].killed = true;
@@ -628,7 +639,7 @@ contract CouponTokenSale is Pausable {
         atStage(Stages.Started) {
 
         require(
-            bountyId < bountyProgram.length && 
+            bountyId < bountyIndex &&
             bountyProgram[bountyId].activated == false && 
             bountyProgram[bountyId].killed == false);
 
@@ -652,7 +663,7 @@ contract CouponTokenSale is Pausable {
         require(remainingBountyTokens >= bountyProgram[bountyId].tokensForEvent);
 
         require(
-            bountyId < bountyProgram.length &&
+            bountyId < bountyIndex &&
             bountyProgram[bountyId].activated == true && 
             bountyProgram[bountyId].killed == false);
 
@@ -678,7 +689,7 @@ contract CouponTokenSale is Pausable {
         require(remainingBountyTokens >= bountyProgram[bountyId].tokensForEvent);
 
         require(
-            bountyId < bountyProgram.length && 
+            bountyId < bountyIndex &&
             bountyProgram[bountyId].activated == true && 
             bountyProgram[bountyId].killed == false);
 
@@ -713,12 +724,12 @@ contract CouponTokenSale is Pausable {
         require(remainingCouponTokens >= noOfTokens);
 
         // Generate new event id
-        uint32 newEventId = uint32(couponProgram.length);
+        uint32 newEventId = couponIndex;
+        couponIndex++;
 
-        couponProgram.length++;
         couponProgram[newEventId].tokensForEvent = noOfTokens;
 
-        return newEventId;
+        emit CouponCreated(newEventId);
     }
     
      /*
@@ -733,7 +744,7 @@ contract CouponTokenSale is Pausable {
         returns (uint32) {
         
         require(
-            couponId < couponProgram.length && 
+            couponId < couponIndex && 
             couponProgram[couponId].killed == false);
 
         couponProgram[couponId].killed = true;
@@ -751,7 +762,7 @@ contract CouponTokenSale is Pausable {
         atStage(Stages.Started) {
 
         require(
-            couponId < couponProgram.length && 
+            couponId < couponIndex && 
             couponProgram[couponId].activated == false && 
             couponProgram[couponId].killed == false);
 
@@ -775,7 +786,7 @@ contract CouponTokenSale is Pausable {
         require(remainingCouponTokens >= couponProgram[couponId].tokensForEvent);
 
         require(
-            couponId < couponProgram.length && 
+            couponId < couponIndex && 
             couponProgram[couponId].activated == true && 
             couponProgram[couponId].killed == false);
 
@@ -800,7 +811,7 @@ contract CouponTokenSale is Pausable {
         require(remainingBountyTokens >= couponProgram[couponId].tokensForEvent);
 
         require(
-            couponId < couponProgram.length && 
+            couponId < couponIndex &&
             couponProgram[couponId].activated == true && 
             couponProgram[couponId].killed == false);
 
@@ -837,7 +848,59 @@ contract CouponTokenSale is Pausable {
         referrals[user] = referredBy;
     }
 
+    //*************************************************************************/
+    //
+    //
+    // F U N C T I O N S   C AL L E D   O NL Y   F RO M   C OU P O N   TO K E N 
+    //
+    //
+    //*************************************************************************/
 
+    function IsFounderVestingPeriodOver(address user)
+        external view
+        onlyCallFromCouponToken
+        returns (bool) {
+
+        bool retVal = true;
+        if(founders[user] > 0 && now < (endSaleTime + 730 days)) // 2 years
+            retVal = false;            
+
+        return retVal;
+    }
+
+    /*
+     *
+     * Function: IsUserParticipatedinLot1to3Sales()
+     *
+    */
+    function IsUserParticipatedinLot1to3Sales(address user) 
+        private view
+        returns (bool){
+
+        bool retVal = false;
+
+        if(lotsInfo[SALE_LOT1].buyerInfo[user].noOfTokensBought > 0 ||
+            lotsInfo[SALE_LOT2].buyerInfo[user].noOfTokensBought > 0 ||
+            lotsInfo[SALE_LOT3].buyerInfo[user].noOfTokensBought > 0)
+            retVal = true;
+
+        return retVal;
+    }
+
+    function IsUserVestingPeriodOver(address user)
+        external view
+        onlyCallFromCouponToken
+        returns (bool) {
+        
+        // See the user participated in lots 1,2 3, if so
+        // he can't do the transfer till the vesting period over
+
+        bool retVal = true;
+        if(IsUserParticipatedinLot1to3Sales(user) == true && now < (startTimeOfSaleLot4 + 90 days))  // 3 months
+            retVal = false;            
+
+        return retVal;
+    }
 
 
     // function TestFunc(uint256 inWei) public view
@@ -854,6 +917,23 @@ contract CouponTokenSale is Pausable {
     //     uint8 a = 1;
     //     uint8 b = 2;
     //     return int8(a-b);
+    // }
+
+    // function getTime() public view returns (uint256) {
+    //     return now;
+    // }
+
+    // function TestFunc() external returns (uint32) {
+    //     //return 1 minutes;
+    //    // Generate new event id
+    //     bountyIndex++;
+    //     EventData storage e = bountyProgram[bountyIndex];
+
+    //     e.tokensForEvent = 100;
+    //     e.activated = true;
+
+        
+    //     return bountyIndex;
     // }
     
 }
