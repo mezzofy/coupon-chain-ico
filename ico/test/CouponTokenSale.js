@@ -1,6 +1,7 @@
 const CCTCoin = artifacts.require("CouponToken.sol");
 const CCTCoinSale = artifacts.require("CouponTokenSale.sol");
-
+const truffleAssert = require('truffle-assertions');
+ 
 contract("Coupon Coin Token Sale Basic Test", (accounts) => {
   const owner = accounts[0];
   const admin = accounts[1];
@@ -85,7 +86,7 @@ contract("Coupon Coin Token addFounders Test", (accounts) => {
       } catch(error){
         if(error==1)
         {
-          var tokenbalance=await token.balanceOf(accounts[5]);
+           var tokenbalance=await token.balanceOf(accounts[5]);
           console.log('Tokens:' ,tokenbalance.toNumber());
           if(tokenbalance.toNumber() <=0)
           {
@@ -134,7 +135,7 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
 
   it("airDrop should not be greater then 25m ",async()=>{
     var airDroppers = [accounts[5],accounts[6],accounts[7]];
-    var tokens=  2500000000 * (10 ** 18); //250 million.
+    var tokens=  2500000001 * (10 ** 18); //250 million.
 
     try {
         await sale.airDrop(airDroppers,token);
@@ -155,24 +156,20 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
       } catch(err) {
         if(err==1)
           assert(false, 'airDrop successful, Owner/Fund/Treasury/Contigency address validation not handled');
- /*        else
-        {
-          var tokenbalance=await token.balanceOf(accounts[5]); 
-          console.log('airDrop Failed. Tokens reverted to User 5:',tokenbalance.toNumber());
-        } */
-    }   
+     }   
   });
 
   it('airDrop validation',async()=>{
     var airDroppers = [accounts[5],accounts[6],accounts[7]];
-    var tokens= 1234; 
+    var tokens= 1000*(10**18); 
   
     try {
       await sale.airDrop(airDroppers,tokens);
       } catch(err) {
           assert(false, 'airDrop Failed.');
-    }   
-
+    } 
+    //var x = await sale.remainingAirDropTokens();
+    //console.log('Airdrop remaining',x.toNumber()/(10**18) );
     var tokenbalance=await token.balanceOf(accounts[5]);
     if(tokenbalance != tokens)
       assert(false,'airDrop successfully done. But tokens not available into users.')
@@ -292,10 +289,10 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
   let sale = null;
   let userSale = null;
 
-  var buyer1 = accounts[4];
-  var buyer2 = accounts[5];
-  var buyer3 = accounts[6];
-  var buyer4 = accounts[7];
+  var buyer1 = accounts[6];
+  var buyer2 = accounts[7];
+  var buyer3 = accounts[8];
+  var buyer4 = accounts[9];
 
   var cents1= 6 * 30000000; // 30 million
   var cents2= 7 * 60000000; // 60 million
@@ -309,10 +306,6 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
     await sale.setupContract(accounts[1],accounts[2],accounts[3]); 
     await sale.setEth2Cents(45000);
     await sale.startSale();    
-
-    userToken = await CCTCoin.new({from: buyer4 });
-    //userSale = await CCTCoinSale.new( userToken.address, { from: buyer4 });
-    //await userToken.setCouponTokenSale(userSale.address);
     
   });
 
@@ -321,30 +314,265 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
     try {
       
       await sale.buyFiat(buyer1,cents1);
-      var tknBalanceOf4=await token.balanceOf(buyer1);
-      console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+      //var tknBalanceOf4=await token.balanceOf(buyer1);
+     // console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
 
       await sale.buyFiat(buyer2,cents2);
-      var tknBalanceOf5=await token.balanceOf(buyer2);
-      console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+      //var tknBalanceOf5=await token.balanceOf(buyer2);
+     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
 
       await sale.buyFiat(buyer3,cents3);
-      var tknBalanceOf6=await token.balanceOf(buyer3);
-      console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
+      //var tknBalanceOf6=await token.balanceOf(buyer3);
+      //console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
 
       await sale.buyFiat(buyer4,cents4);
-      var tknBalanceOf7=await token.balanceOf(buyer4);
-      console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+      //var tknBalanceOf7=await token.balanceOf(buyer4);
+      //console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
       
       await sale.endSale();
-      console.log('Sales ended.'); 
+      //console.log('Sales ended.'); 
 
-      await userToken.transferFrom(buyer4,buyer2,1000);
+      await token.transfer(buyer2,1000 *(10**18),{from: buyer4 });
 
-      } catch(err) {
+     // var tknBalanceOf5=await token.balanceOf(buyer2);
+     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+     // var tknBalanceOf7=await token.balanceOf(buyer4);
+     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+
+    } catch(err) {
+          assert(false, 'users transfer Failed.');
+    }   
+  });
+
+  it('**NOT COMPLETE** transfer to founder should not allow before the vesting period complete.',async()=>{
+ 
+    try {
+      
+
+/*       var founders = [accounts[2],accounts[3],accounts[4]];
+      var tokens= [1001,10001,100001];   
+  
+      await sale.addFounders(founders,tokens);  */
+
+
+      await sale.buyFiat(buyer1,cents1);
+      //var tknBalanceOf4=await token.balanceOf(buyer1);
+      //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer2,cents2);
+     // var tknBalanceOf5=await token.balanceOf(buyer2);
+     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer3,cents3);
+      //var tknBalanceOf6=await token.balanceOf(buyer3);
+     // console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
+
+      await sale.buyFiat(buyer4,cents4);
+    //  var tknBalanceOf7=await token.balanceOf(buyer4);
+     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+      
+      await sale.endSale();
+      //console.log('Sales ended.'); 
+
+      await token.transfer(buyer2,1000 *(10**18),{from: buyer4 });
+
+     // var tknBalanceOf5=await token.balanceOf(buyer2);
+     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+     // var tknBalanceOf7=await token.balanceOf(buyer4);
+     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+
+    } catch(err) {
           assert(false, 'users transfer Failed.');
     }   
 
+  });  
+
+});
+
+contract("Coupon Coin Token bounty program Test",(accounts)=>{
+
+  const owner = accounts[0];
+  
+  let token = null;
+  let userToken = null;
+  let sale = null;
+  let userSale = null;
+
+  var buyer1 = accounts[6];
+  var buyer2 = accounts[7];
+  var buyer3 = accounts[8];
+  var buyer4 = accounts[9];
+
+  var cents1= 6 * 30000000; // 30 million
+  var cents2= 7 * 60000000; // 60 million
+  var cents3= 8 * 90000000; // 90 million
+  var cents4= 9 *120000000; // 120 million  
+
+  var BountyTotalTokens = 15000000;
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[1],accounts[2],accounts[3]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();  
+    await sale.createBounty(100*(10**18));  
   });
 
+
+  it("creteBounty/fullfillmentBounty validation",function (done){
+
+    try {
+      sale.createBounty(1000*(10**18));
+  
+      var bountyCreate = sale.BountyCreated();      
+      bountyCreate.watch(async function(err, result){
+        bountyCreate.stopWatching();             
+        if(err){
+          console.log(err);
+          return done(err);
+        }
+        await sale.buyFiat(buyer1,cents1);
+        await sale.buyFiat(buyer2,cents2);
+  
+        var newBountyId = result.args.newBountyId;
+        //console.log('Bounty Id:', newBountyId.toNumber());
+  
+        sale.activateBounty(newBountyId)
+        //console.log('Activated Bounty Id: ',newBountyId.toNumber());
+
+        var bountyremaining = await sale.remainingBountyTokens();
+        if(BountyTotalTokens == bountyremaining)
+          assert(false,'Bounty Program error.Bounty token balance handled properly.');
+    
+        sale.fullfillmentBounty(newBountyId,buyer1);
+        sale.fullfillmentBounty(newBountyId,buyer2);
+
+        //tknBalanceOf4= await token.balanceOf(buyer1);
+        //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+        //tknBalanceOf5=await token.balanceOf(buyer2);
+        //console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+        done();
+     })        
+     
+     } catch(err) {
+      assert(false, 'createBounty Failed');
+    }   
+  });
+
+  it("creteBounty should not exceed the Bounty Maximum Limit",async () => {
+
+    try {
+      await sale.createBounty(150000001*(10**18));
+      throw(1);
+
+     } catch(err) {
+       if(err == 1)
+          assert(false, 'createBounty successful.Max limit not handled.');
+    }   
+  });  
+
+  it("createBounty bountyID validation",function (done) {
+
+    try {
+      sale.createBounty(1000*(10**18));
+  
+      var bountyCreate = sale.BountyCreated();      
+      bountyCreate.watch(async function(err, result){
+        bountyCreate.stopWatching();             
+        if(err){
+          console.log(err);
+          return done(err);
+        }
+ 
+        var newBountyId = result.args.newBountyId;
+        //console.log('Bounty Id:', newBountyId.toNumber());
+        if(newBountyId == 0)
+        {
+          err = 1;
+          return done(err);
+        }
+        done();
+     })        
+     } catch(err) {
+       if(err == 1)
+        assert(false, 'createBounty success, bountyId not handled properly.');
+    }   
+  });
+});
+
+contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
+
+  const owner = accounts[0];
+  
+  let token = null;
+  let userToken = null;
+  let sale = null;
+  let userSale = null;
+
+  var buyer1 = accounts[6];
+  var buyer2 = accounts[7];
+  var buyer3 = accounts[8];
+  var buyer4 = accounts[9];
+
+  var cents1= 6 * 30000000; // 30 million
+  var cents2= 7 * 60000000; // 60 million
+  var cents3= 8 * 90000000; // 90 million
+  var cents4= 9 *120000000; // 120 million  
+
+  var CouponCampaignTotalTokens = 15000000;
+  var coupons = ['abc1','abc2','abc3'];
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[1],accounts[2],accounts[3]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();  
+    await sale.createCouponCompaign(1000 *(10**18));
+  });
+
+
+  it("createCouponCompaign validation",function (done) {
+   try {
+      sale.createCouponCompaign(1000 *(10**18));
+  
+      var compaignCreate = sale.CouponCampaignCreated();      
+      compaignCreate.watch(async function(err, result){
+      compaignCreate.stopWatching();             
+      if(err){
+        console.log(err);
+        return done(err);
+      }
+      var newEventId = result.args.newEventId;
+      //console.log('Compaign Id:', newEventId.toNumber());
+
+      await sale.addCoupon2Compaign(newEventId,coupons)
+      await sale.activateCouponCompaign(newEventId);
+      await sale.redeemCoupon(coupons[0],buyer1);
+      await sale.redeemCoupon(coupons[0],buyer2);
+      //var tknBalanceOf4= await token.balanceOf(buyer2);
+      //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+
+      done();
+     })        
+     } catch(err) {
+        assert(false, 'couponCompaign failed.');
+    }   
+  });
+
+  it("Coupon compaign should not exceed its maximum tokens.", async () =>  {
+    try {
+       await sale.createCouponCompaign(1500000000 *(10**18));
+       throw(1);
+   
+      } catch(err) {
+       if(err == 1)
+         assert(false, 'couponCompaign success, maximum tokens not handled properly.');
+     }   
+   });
 });
