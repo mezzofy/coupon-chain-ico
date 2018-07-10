@@ -576,3 +576,47 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
      }   
    });
 });
+
+contract("Coupon Coin Token addReferrer Test",(accounts)=>{
+ 
+  const owner = accounts[0];
+  const admin = accounts[1];
+  const fund = accounts[2];
+  const user = accounts[3];
+
+  let token = null;
+  let sale = null;
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner }
+
+    );
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();
+  });
+
+  it('buyFiat using addReferrer',async()=>{
+    var buyer = accounts[5];
+    var referrer = accounts[6];
+    var cents= 6*100; 
+  
+    try {
+      await sale.addReferrer(buyer,referrer);
+      await sale.buyFiat(buyer,cents);
+      var tokenbalance=await token.balanceOf(buyer);
+      console.log('Buyer:',tokenbalance.toNumber()/(10**18));
+      var tokenbalance1=await token.balanceOf(referrer);
+      console.log('Referrer:',tokenbalance1.toNumber()/(10**18));
+
+      } catch(err) {
+          assert(false, 'buyFiat Failed.');
+    }   
+
+    var tokenbalance=await token.balanceOf(accounts[5]);
+    if(tokenbalance == 0)
+      assert(false,'buyFiat Failed. But tokens not available into users.')
+  });  
+});
