@@ -41,10 +41,10 @@ contract CouponTokenSale is Pausable {
     uint256 public remainingTreasuryTokens;
 
     // Compaigns Tokens
-    uint256 remainingAirDropTokens;
-    uint256 remainingBountyTokens;
-    uint256 remainingCouponTokens;
-    uint256 remainingReferralTokens;
+    uint256 public remainingAirDropTokens;
+    uint256 public remainingBountyTokens;
+    uint256 public remainingCouponTokens;
+    uint256 public remainingReferralTokens;
 
     /*
      *
@@ -319,7 +319,12 @@ contract CouponTokenSale is Pausable {
             totalFounderAllocation = totalFounderAllocation.add(Tokens[i]);
 
             // Founders address should validate following
-            require(Users[i] != address(0) && Users[i] != fundAddr && Users[i] != treasuryAddr && Users[i] != contigencyAddr && Tokens[i] > 0);
+            require(
+                Users[i] != address(0) && 
+                Users[i] != fundAddr && 
+                Users[i] != treasuryAddr && 
+                Users[i] != contigencyAddr && 
+                Tokens[i] > 0);
         }
         
         // Total tokens should be more than CAP
@@ -586,8 +591,13 @@ contract CouponTokenSale is Pausable {
 
         for(uint16 i = 0; i < users.length; i++) {
 
-            // Founders address should validate following
-            require(users[i] != address(0) && users[i] != fundAddr && users[i] != treasuryAddr && users[i] != contigencyAddr);
+            // user should not be empty, founder, owner, treasury, contigency address
+            require(
+                users[i] != address(0x0) &&
+                users[i] != fundAddr && 
+                users[i] != treasuryAddr &&
+                users[i] != contigencyAddr &&
+                founders[users[i]] == 0);
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
@@ -668,6 +678,14 @@ contract CouponTokenSale is Pausable {
         onlyOwner
         atStage(Stages.Started) {
 
+        // user should not be empty, founder, owner, treasury, contigency address
+        require(
+            user != address(0x0) &&
+            user != fundAddr && 
+            user != treasuryAddr &&
+            user != contigencyAddr &&
+            founders[user] == 0);
+
         // Condition
         require(remainingBountyTokens >= bountyProgram[bountyId].tokensForEvent);
 
@@ -705,12 +723,12 @@ contract CouponTokenSale is Pausable {
         require(remainingCouponTokens >= noOfTokens);
 
         // Generate new event id
-        uint32 newEventId = couponCampaignIndex;
+        uint32 newCouponId = couponCampaignIndex;
         couponCampaignIndex++;
 
-        couponCampaignProgram[newEventId].tokensForEvent = noOfTokens;
+        couponCampaignProgram[newCouponId].tokensForEvent = noOfTokens;
 
-        emit CouponCampaignCreated(newEventId);
+        emit CouponCampaignCreated(newCouponId);
     }
     
      /*
@@ -792,7 +810,14 @@ contract CouponTokenSale is Pausable {
         onlyOwner
         atStage(Stages.Started) {
 
-        
+        // user should not be empty, founder, owner, treasury, contigency address
+        require(
+            user != address(0x0) &&
+            user != fundAddr && 
+            user != treasuryAddr &&
+            user != contigencyAddr &&
+            founders[user] == 0);
+
         // Coupon should be added already and not redeemed
         require(couponInfo[couponId].added == true && couponInfo[couponId].redeemed == false);
 
@@ -829,10 +854,22 @@ contract CouponTokenSale is Pausable {
         onlyOwner
         atStage(Stages.Started) {
 
-        require(user != address(0x0) && referredBy != address(0x0));
+        // user should not be empty, founder, owner, treasury, contigency address
+        require(
+            user != address(0x0) &&
+            user != fundAddr && 
+            user != treasuryAddr &&
+            user != contigencyAddr &&
+            founders[user] == 0);
 
-        require(referrals[user] == address(0x0));
-
+        // referredBy should not be empty, founder, owner, treasury, contigency address
+        require(
+            referredBy != address(0x0) &&
+            referredBy != fundAddr && 
+            referredBy != treasuryAddr &&
+            referredBy != contigencyAddr &&
+            founders[referredBy] == 0);
+        
         referrals[user] = referredBy;
     }
 
