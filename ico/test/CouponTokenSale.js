@@ -461,7 +461,6 @@ contract("Coupon Coin Token bounty program Test",(accounts)=>{
   });
 
   it("creteBounty/fullfillmentBounty validation",function (done){
-
     try {
       sale.createBounty(1000*(10**18));
   
@@ -538,9 +537,8 @@ contract("Coupon Coin Token bounty program Test",(accounts)=>{
         
         done();
      })        
-     
-     } catch(err) {
-      assert(false, 'createBounty Failed');
+    } catch(err) {
+     assert(false, 'createBounty Failed');
     }   
   });
 
@@ -705,7 +703,6 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
           assert(false,'coupon campaign program not allowed for owner/founders. but not handled here.')
        }
        
-       
        //var tknBalanceOf4= await token.balanceOf(buyer2);
        //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
  
@@ -788,15 +785,12 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
 contract("Coupon Coin Token addReferrer Test",(accounts)=>{
  
   const owner = accounts[0];
-
   let token = null;
   let sale = null;
 
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
-    sale = await CCTCoinSale.new( token.address, { from: owner }
-
-    );
+    sale = await CCTCoinSale.new( token.address, { from: owner });
     await token.setCouponTokenSale(sale.address);
     await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
     await sale.setEth2Cents(45000);
