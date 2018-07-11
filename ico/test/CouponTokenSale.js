@@ -1,6 +1,5 @@
 const CCTCoin = artifacts.require("CouponToken.sol");
 const CCTCoinSale = artifacts.require("CouponTokenSale.sol");
-const truffleAssert = require('truffle-assertions');
  
 contract("Coupon Coin Token Sale Basic Test", (accounts) => {
   const owner = accounts[0];
@@ -96,7 +95,36 @@ contract("Coupon Coin Token addFounders Test", (accounts) => {
       }
     }); 
 
+    it('once sale begun, owner should not allow to add any Founders',async()=>{
+      var founders = [accounts[5],accounts[6],accounts[7]];
+      var tokens= [0,110,1110];    
+
+      try{
+        await sale.setEth2Cents(45000);
+        await sale.startSale();
+        await sale.addFounders(founders,tokens);
+        throw(1);
+      } catch(error){
+        if(error==1)
+        {
+            assert(false, 'addFounders successful, add a founder should not allow once sale started.');
+         }
+      }
+    });     
   
+  
+    it('only owner should call this function.',async()=>{
+      var founders = [accounts[5],accounts[6],accounts[7]];
+      var tokens= [10,110,1110];    
+       try {
+        await sale.addFounders(founders,tokens,{from:accounts[7]});
+        throw(1);
+        } catch(err) {
+          if(err == 1)
+            assert(false, 'only owner call this function. validation not handled.');
+      }   
+    }); 
+
   it("addFounders validation",async()=>{
     var founders = [accounts[5],accounts[6],accounts[7]];
     var tokens= [1001,10001,100001];   
@@ -122,15 +150,18 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
 
   let token = null;
   let sale = null;
+  let sale1=null;
 
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
-    sale = await CCTCoinSale.new( token.address, { from: owner }
-    );
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    
+    
     await token.setCouponTokenSale(sale.address);
     await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
     await sale.setEth2Cents(45000);
     await sale.startSale();
+   
   });
 
   it("airDrop should not be greater then 25m ",async()=>{
@@ -158,6 +189,19 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
           assert(false, 'airDrop successful, Owner/Fund/Treasury/Contigency address validation not handled');
      }   
   });
+
+  it('only owner should call this function.',async()=>{
+    var airDroppers = [accounts[5],accounts[6],accounts[7]];
+    var tokens= 1001;   
+
+     try {
+      await sale.airDrop(airDroppers,tokens,{from:accounts[5]});
+      throw(1);
+      } catch(err) {
+        if(err==1)
+          assert(false, 'only owner call this function. validation not handled.');
+      }   
+  });   
 
   it('airDrop validation',async()=>{
     var airDroppers = [accounts[5],accounts[6],accounts[7]];
@@ -280,7 +324,7 @@ contract("Coupon Coin Token buyFiat & calculatePoolBonus Test",(accounts)=>{
 
 });
 
-contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
+contract("Coupon Coin Token transfer Test",(accounts)=>{
 
   const owner = accounts[0];
   
@@ -309,7 +353,7 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
     
   });
 
-  it('transfer tokens from users test',async()=>{
+  it('LOT4 users should allow to transfer without any vesting period',async()=>{
  
     try {
       
@@ -345,37 +389,31 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
     }   
   });
 
-  it('**NOT COMPLETE** transfer to founder should not allow before the vesting period complete.',async()=>{
+  it('LOT1/LOT2/LOT3 users should not allow to transfer until vesting period over.',async()=>{
  
     try {
       
-
-/*       var founders = [accounts[2],accounts[3],accounts[4]];
-      var tokens= [1001,10001,100001];   
-  
-      await sale.addFounders(founders,tokens);  */
-
-
       await sale.buyFiat(buyer1,cents1);
       //var tknBalanceOf4=await token.balanceOf(buyer1);
-      //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+     // console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
 
       await sale.buyFiat(buyer2,cents2);
-     // var tknBalanceOf5=await token.balanceOf(buyer2);
+      //var tknBalanceOf5=await token.balanceOf(buyer2);
      // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
 
       await sale.buyFiat(buyer3,cents3);
       //var tknBalanceOf6=await token.balanceOf(buyer3);
-     // console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
+      //console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
 
       await sale.buyFiat(buyer4,cents4);
-    //  var tknBalanceOf7=await token.balanceOf(buyer4);
-     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+      //var tknBalanceOf7=await token.balanceOf(buyer4);
+      //console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
       
       await sale.endSale();
       //console.log('Sales ended.'); 
 
-      await token.transfer(buyer2,1000 *(10**18),{from: buyer4 });
+      await token.transfer(buyer2,1000 *(10**18),{from: buyer1 });
+      thwo(1);
 
      // var tknBalanceOf5=await token.balanceOf(buyer2);
      // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
@@ -384,9 +422,9 @@ contract("Coupon Coin Token transfer & transferFrom Test",(accounts)=>{
      // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
 
     } catch(err) {
-          assert(false, 'users transfer Failed.');
+      if(err == 1)
+          assert(false, 'users transfer success.vesting period validation not handled.');
     }   
-
   });  
 
 });
@@ -421,7 +459,6 @@ contract("Coupon Coin Token bounty program Test",(accounts)=>{
     await sale.startSale();  
     await sale.createBounty(100*(10**18));  
   });
-
 
   it("creteBounty/fullfillmentBounty validation",function (done){
 
@@ -463,6 +500,50 @@ contract("Coupon Coin Token bounty program Test",(accounts)=>{
     }   
   });
 
+  it("owner/admin/founders should not allow for bounty program.",function (done){
+
+    try {
+      sale.createBounty(1000*(10**18));
+  
+      var bountyCreate = sale.BountyCreated();      
+      bountyCreate.watch(async function(err, result){
+        bountyCreate.stopWatching();             
+        if(err){
+          console.log(err);
+          return done(err);
+        }
+        await sale.buyFiat(buyer1,cents1);
+        await sale.buyFiat(buyer2,cents2);
+  
+        var newBountyId = result.args.newBountyId;
+        //console.log('Bounty Id:', newBountyId.toNumber());
+  
+        sale.activateBounty(newBountyId)
+        //console.log('Activated Bounty Id: ',newBountyId.toNumber());
+
+        var bountyremaining = await sale.remainingBountyTokens();
+        if(BountyTotalTokens == bountyremaining)
+          assert(false,'Bounty Program error.Bounty token balance handled properly.');
+    
+        try
+        {
+          await sale.fullfillmentBounty(newBountyId,owner);
+          throw(1);
+        }
+        catch(err)
+        {
+          if(err == 1)
+            assert(false,'owner should not allow to participate bounty program.')
+        }
+        
+        done();
+     })        
+     
+     } catch(err) {
+      assert(false, 'createBounty Failed');
+    }   
+  });
+
   it("creteBounty should not exceed the Bounty Maximum Limit",async () => {
 
     try {
@@ -473,6 +554,39 @@ contract("Coupon Coin Token bounty program Test",(accounts)=>{
        if(err == 1)
           assert(false, 'createBounty successful.Max limit not handled.');
     }   
+  });  
+
+  it("killBounty validation",function (done) {
+
+    var newBountyId;
+    try {
+      sale.createBounty(1000*(10**18));
+      var bountyCreate = sale.BountyCreated();      
+      bountyCreate.watch(async function(err, result){
+        bountyCreate.stopWatching();             
+        if(err){
+          console.log(err);
+          return done(err);
+        }
+        newBountyId = result.args.newBountyId;
+
+        await sale.activateBounty(newBountyId)
+        oldBountyId = newBountyId;
+        await sale.killBounty(newBountyId);
+    
+        try{
+          await sale.activateBounty(newBountyId);
+          throw(1);
+        }catch(err)
+        {
+          if(err == 1)
+            assert(false,'activateBounty succeeded for a invalid bounty id. chk killbounty.');
+        }
+        done();
+     })        
+     } catch(err) {
+          assert(false, 'killBounty Failed.');
+    }       
   });  
 
   it("createBounty bountyID validation",function (done) {
@@ -524,7 +638,7 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
   var cents4= 9 *120000000; // 120 million  
 
   var CouponCampaignTotalTokens = 15000000;
-  var coupons = ['abc1','abc2','abc3'];
+  var coupons = ['abc','def','ghi'];
 
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
@@ -548,11 +662,11 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
         console.log(err);
         return done(err);
       }
-      var newEventId = result.args.newEventId;
-      //console.log('Compaign Id:', newEventId.toNumber());
+      var newCouponId = result.args.newCouponId;
+      //console.log('Compaign Id:', newCouponId.toNumber());
 
-      await sale.addCoupon2Compaign(newEventId,coupons)
-      await sale.activateCouponCompaign(newEventId);
+      await sale.addCoupon2Compaign(newCouponId,coupons);
+      await sale.activateCouponCompaign(newCouponId);
       await sale.redeemCoupon(coupons[0],buyer1);
       await sale.redeemCoupon(coupons[0],buyer2);
       //var tknBalanceOf4= await token.balanceOf(buyer2);
@@ -564,6 +678,100 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
         assert(false, 'couponCompaign failed.');
     }   
   });
+
+  it("owner/admin/founders not allowed for Coupom compaign.",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+       compaignCreate.stopWatching();             
+       if(err){
+         console.log(err);
+         return done(err);
+       }
+       var newCouponId = result.args.newCouponId;
+       //console.log('Compaign Id:', newCouponId.toNumber());
+ 
+       await sale.addCoupon2Compaign(newCouponId,coupons);
+       await sale.activateCouponCompaign(newCouponId);
+
+       try{
+        await sale.redeemCoupon(coupons[0],owner);
+        throw(1);
+       }catch(err)
+       {
+         if(err == 1)
+          assert(false,'coupon campaign program not allowed for owner/founders. but not handled here.')
+       }
+       
+       
+       //var tknBalanceOf4= await token.balanceOf(buyer2);
+       //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+ 
+       done();
+      })        
+      } catch(err) {
+         assert(false, 'couponCompaign failed.');
+     }   
+   });
+ 
+  it("createCouponCompaign & Id validation",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+        compaignCreate.stopWatching();             
+        if(err){
+         console.log(err);
+         return done(err);
+        }
+        var newCouponId = result.args.newCouponId;
+        //console.log('Compaign Id:', newCouponId.toNumber());
+        if(newCouponId == 0)
+          assert(false,'CouponId generation is not working properly.')
+        done();
+      })        
+      } catch(err) {
+         assert(false, 'couponCompaign failed.');
+     }   
+   });
+ 
+
+  it("killCouponCompaign validation",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+       compaignCreate.stopWatching();             
+       if(err){
+         console.log(err);
+         return done(err);
+       }
+       var newCouponId = result.args.newCouponId;
+       await sale.addCoupon2Compaign(newCouponId,coupons);
+       await sale.activateCouponCompaign(newCouponId);
+
+       await sale.killCouponCompaign(newCouponId);
+ 
+       try{
+        await sale.activateCouponCompaign(newCouponId);
+        throw(1);
+      }catch(err)
+      {
+        if(err == 1)
+          assert(false,'activateCouponCompaign succeeded for a invalid coupon id. chk activateCouponCompaign.');
+      }       
+
+       done();
+      })        
+      } catch(err) {
+         assert(false, 'couponCompaign failed.');
+     }   
+   });
+ 
 
   it("Coupon compaign should not exceed its maximum tokens.", async () =>  {
     try {
@@ -580,9 +788,6 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
 contract("Coupon Coin Token addReferrer Test",(accounts)=>{
  
   const owner = accounts[0];
-  const admin = accounts[1];
-  const fund = accounts[2];
-  const user = accounts[3];
 
   let token = null;
   let sale = null;
@@ -607,9 +812,9 @@ contract("Coupon Coin Token addReferrer Test",(accounts)=>{
       await sale.addReferrer(buyer,referrer);
       await sale.buyFiat(buyer,cents);
       var tokenbalance=await token.balanceOf(buyer);
-      console.log('Buyer:',tokenbalance.toNumber()/(10**18));
+      //console.log('Buyer:',tokenbalance.toNumber()/(10**18));
       var tokenbalance1=await token.balanceOf(referrer);
-      console.log('Referrer:',tokenbalance1.toNumber()/(10**18));
+      //console.log('Referrer:',tokenbalance1.toNumber()/(10**18));
 
       } catch(err) {
           assert(false, 'buyFiat Failed.');
@@ -618,5 +823,29 @@ contract("Coupon Coin Token addReferrer Test",(accounts)=>{
     var tokenbalance=await token.balanceOf(accounts[5]);
     if(tokenbalance == 0)
       assert(false,'buyFiat Failed. But tokens not available into users.')
+  }); 
+  
+
+  it('owner/admin/founder should not be a referrer',async()=>{
+    var cents= 6*100; 
+     try {
+      await sale.addReferrer(owner,accounts[2]);
+      throw(1);
+      } catch(err) {
+        if(err == 1)
+          assert(false, 'owner not allowed to be a referrer. validation not handled.');
+    }   
   });  
+  
+  it('only owner should call this function.',async()=>{
+    var cents= 6*100; 
+     try {
+      await sale.addReferrer(accounts[5],accounts[6], {from:accounts[6]});
+      throw(1);
+      } catch(err) {
+        if(err == 1)
+          assert(false, 'owner only call this function. validation not handled.');
+    }   
+  }); 
+
 });
