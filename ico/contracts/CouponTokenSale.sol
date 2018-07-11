@@ -321,6 +321,7 @@ contract CouponTokenSale is Pausable {
             // Founders address should validate following
             require(
                 Users[i] != address(0) && 
+                Users[i] != owner &&
                 Users[i] != fundAddr && 
                 Users[i] != treasuryAddr && 
                 Users[i] != contigencyAddr && 
@@ -594,6 +595,7 @@ contract CouponTokenSale is Pausable {
             // user should not be empty, founder, owner, treasury, contigency address
             require(
                 users[i] != address(0x0) &&
+                users[i] != owner &&
                 users[i] != fundAddr && 
                 users[i] != treasuryAddr &&
                 users[i] != contigencyAddr &&
@@ -681,6 +683,7 @@ contract CouponTokenSale is Pausable {
         // user should not be empty, founder, owner, treasury, contigency address
         require(
             user != address(0x0) &&
+            user != owner &&
             user != fundAddr && 
             user != treasuryAddr &&
             user != contigencyAddr &&
@@ -813,6 +816,7 @@ contract CouponTokenSale is Pausable {
         // user should not be empty, founder, owner, treasury, contigency address
         require(
             user != address(0x0) &&
+            user != owner &&
             user != fundAddr && 
             user != treasuryAddr &&
             user != contigencyAddr &&
@@ -857,6 +861,7 @@ contract CouponTokenSale is Pausable {
         // user should not be empty, founder, owner, treasury, contigency address
         require(
             user != address(0x0) &&
+            user != owner &&
             user != fundAddr && 
             user != treasuryAddr &&
             user != contigencyAddr &&
@@ -865,6 +870,7 @@ contract CouponTokenSale is Pausable {
         // referredBy should not be empty, founder, owner, treasury, contigency address
         require(
             referredBy != address(0x0) &&
+            referredBy != owner &&
             referredBy != fundAddr && 
             referredBy != treasuryAddr &&
             referredBy != contigencyAddr &&
