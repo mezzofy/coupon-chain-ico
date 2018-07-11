@@ -110,8 +110,7 @@ contract("Coupon Coin Token addFounders Test", (accounts) => {
          }
       }
     });     
-  
-  
+   
     it('only owner should call this function.',async()=>{
       var founders = [accounts[5],accounts[6],accounts[7]];
       var tokens= [10,110,1110];    
@@ -341,51 +340,44 @@ contract("Coupon Coin Token transfer Test",(accounts)=>{
   it('LOT4 users should allow to transfer without any vesting period',async()=>{
     try {
       await sale.buyFiat(buyer1,cents1);
-      //var tknBalanceOf4=await token.balanceOf(buyer1);
-     // console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
       await sale.buyFiat(buyer2,cents2);
-      //var tknBalanceOf5=await token.balanceOf(buyer2);
-     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
       await sale.buyFiat(buyer3,cents3);
-      //var tknBalanceOf6=await token.balanceOf(buyer3);
-      //console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
       await sale.buyFiat(buyer4,cents4);
-      //var tknBalanceOf7=await token.balanceOf(buyer4);
-      //console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
       await sale.endSale();
-      //console.log('Sales ended.'); 
       await token.transfer(buyer2,1000 *(10**18),{from: buyer4 });
-     // var tknBalanceOf5=await token.balanceOf(buyer2);
-     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
-     // var tknBalanceOf7=await token.balanceOf(buyer4);
-     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
     }catch(err) {
       assert(false, 'users transfer Failed.');
     }   
   });
 
+  it("fouders should not allow to transfer until vesting period over.",async()=>{
+    var founders = [accounts[5],accounts[6],accounts[7]];
+    var tokens= [1001,10001,100001];   
+  
+    try{
+      await sale.addFounders(founders,tokens);
+      var tokenbalance=await token.balanceOf(accounts[5]);
+      //console.log('Tokens for account no5 :' ,tokenbalance.toNumber());
+      if(tokenbalance != tokens[0])
+        assert(false,'addFounder successfully done. But tokens not available into users.')    
+      await token.transfer(buyer2,1000 *(10**18),{from:accounts[5]});
+      throw(1);
+      }catch(err)
+      {
+        if(err == 1)
+          assert(false, 'founder transfer success.vesting period validation not handled.');
+      }
+  });    
+
   it('LOT1/LOT2/LOT3 users should not allow to transfer until vesting period over.',async()=>{
      try {
        await sale.buyFiat(buyer1,cents1);
-      //var tknBalanceOf4=await token.balanceOf(buyer1);
-     // console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
       await sale.buyFiat(buyer2,cents2);
-      //var tknBalanceOf5=await token.balanceOf(buyer2);
-     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
       await sale.buyFiat(buyer3,cents3);
-      //var tknBalanceOf6=await token.balanceOf(buyer3);
-      //console.log('User 3 Balance:',tknBalanceOf6.toNumber()/(10**18));
       await sale.buyFiat(buyer4,cents4);
-      //var tknBalanceOf7=await token.balanceOf(buyer4);
-      //console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
       await sale.endSale();
-      //console.log('Sales ended.'); 
-      await token.transfer(buyer2,1000 *(10**18),{from: buyer1 });
-      thwo(1);
-     // var tknBalanceOf5=await token.balanceOf(buyer2);
-     // console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
-     // var tknBalanceOf7=await token.balanceOf(buyer4);
-     // console.log('User 4 Balance:',tknBalanceOf7.toNumber()/(10**18)); 
+      await token.transfer(buyer2,1000 *(10**18),{from:buyer1});
+      throw(1);
     }catch(err) {
       if(err == 1)
           assert(false, 'users transfer success.vesting period validation not handled.');
