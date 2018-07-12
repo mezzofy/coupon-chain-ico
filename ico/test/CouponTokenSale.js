@@ -575,6 +575,7 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
 
   var CouponCampaignTotalTokens = 15000000;
   var coupons = ['abc','def','ghi'];
+  var coupons1 =['abc','jkl','mno'];
 
   beforeEach("setup contract for each test", async () => {
     token = await CCTCoin.new({from: owner });
@@ -583,7 +584,7 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
     await sale.setupContract(accounts[1],accounts[2],accounts[3]); 
     await sale.setEth2Cents(45000);
     await sale.startSale();  
-    await sale.createCouponCompaign(1000 *(10**18));
+    await sale.createCouponCompaign(11 *(10**18));
   });
 
 
@@ -603,7 +604,7 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
       await sale.addCoupon2Compaign(newCouponId,coupons);
       await sale.activateCouponCompaign(newCouponId);
       await sale.redeemCoupon(coupons[0],buyer1);
-      await sale.redeemCoupon(coupons[0],buyer2);
+      await sale.redeemCoupon(coupons[1],buyer2);
       //var tknBalanceOf4= await token.balanceOf(buyer2);
       //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
       done();
@@ -613,7 +614,49 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
     }   
   });
 
-  it("owner/admin/founders not allowed for Coupom compaign.",function (done) {
+  it("*** NOT YET COMPLETED **** coupon redeem works for the given compaign.",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+       compaignCreate.stopWatching();             
+       if(err){
+         console.log(err);
+         return done(err);
+       }
+       var tknBalanceBefore= await token.balanceOf(buyer1);
+       console.log('User 1 Balance:',tknBalanceBefore.toNumber()/(10**18));
+
+       var newCouponId = result.args.newCouponId;
+       console.log('Compaign Id:', newCouponId.toNumber());
+       await sale.addCoupon2Compaign(newCouponId,coupons);
+       await sale.activateCouponCompaign(newCouponId);
+       try{
+        await sale.redeemCoupon(coupons[0],buyer1);
+        var tknBalanceAfter= await token.balanceOf(buyer1);
+        console.log('User 1 Balance After Redeemed:',tknBalanceAfter.toNumber()/(10**18));        
+        if(tknBalanceBefore == tknBalanceAfter)
+        {
+          throw(1);
+        }
+       }catch(err)
+       {
+         if(err==1)
+         {
+            assert.equal(false,'redeemCoupon not successful, failed to transfer coupons to user.');
+         }
+       }
+       done();  
+      })        
+      }catch(err){
+        assert(false,'couponcompaign error.');
+     }  
+
+   });
+ 
+
+  it("coupon id cannot be redeemed twice.",function (done) {
     try {
        sale.createCouponCompaign(1000 *(10**18));
    
@@ -625,19 +668,152 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
          return done(err);
        }
        var newCouponId = result.args.newCouponId;
-       //console.log('Compaign Id:', newCouponId.toNumber());
        await sale.addCoupon2Compaign(newCouponId,coupons);
        await sale.activateCouponCompaign(newCouponId);
+       await sale.redeemCoupon(coupons[0],buyer1);
        try{
-        await sale.redeemCoupon(coupons[0],owner);
+        await sale.redeemCoupon(coupons[0],buyer1);
         throw(1);
        }catch(err)
        {
-         if(err == 1)
-          assert(false,'coupon campaign program not allowed for owner/founders. but not handled here.')
+         if(err==1)
+          assert(false,'coupon id cannot be redeemed twice.Not Handled.');
        }
-       //var tknBalanceOf4= await token.balanceOf(buyer2);
-       //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+       done();
+      })        
+      }catch(err) {
+       assert(false, 'couponCompaign failed.');
+     }   
+   });
+
+   it("before activate coupon, it should not allow to redeem.",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+       compaignCreate.stopWatching();             
+       if(err){
+         console.log(err);
+         return done(err);
+       }
+      var newCouponId = result.args.newCouponId;
+      await sale.addCoupon2Compaign(newCouponId,coupons);
+      try{
+       await sale.redeemCoupon(coupons[0],buyer1);
+       throw(1);
+      }catch(err)
+      {
+        if(err == 1)
+          assert(false,'before activate coupon, it should not allow to redeem.Not handled.')
+      }
+
+        done();
+      })        
+      }catch(err) {
+       assert(false, 'couponCompaign failed.');
+     }   
+   });   
+ 
+   it("after kill couponCompaign, it should not allow to redeem.",function (done) {
+    try {
+       sale.createCouponCompaign(1000 *(10**18));
+   
+       var compaignCreate = sale.CouponCampaignCreated();      
+       compaignCreate.watch(async function(err, result){
+       compaignCreate.stopWatching();             
+       if(err){
+         console.log(err);
+         return done(err);
+       }
+      var newCouponId = result.args.newCouponId;
+      await sale.addCoupon2Compaign(newCouponId,coupons);
+      await sale.activateCouponCompaign(newCouponId);
+      await sale.killCouponCompaign(newCouponId);
+
+      try{
+       await sale.redeemCoupon(coupons[0],buyer1);
+       throw(1);
+      }catch(err)
+      {
+        if(err == 1)
+          assert(false,'after kill couponCompaign, it should not allow to redeem.Not handled.')
+      }
+
+        done();
+      })        
+      }catch(err) {
+       assert(false, 'couponCompaign failed.');
+     }   
+   });   
+
+  it("coupon id should be unique for every compaign.",function (done) {
+    try {
+       
+    sale.createCouponCompaign(10 *(10**18));
+    var compaignCreate = sale.CouponCampaignCreated();      
+    compaignCreate.watch(async function(err, result){
+      compaignCreate.stopWatching();             
+      if(err){
+        console.log(err);
+        return done(err);
+       }
+      var compaignId = result.args.newCouponId;
+      //console.log('Compaign Id:', compaignId.toNumber());
+      await sale.addCoupon2Compaign(compaignId,coupons);
+      
+      
+      sale.createCouponCompaign(100 *(10**18));
+      var compaignCreate1 = sale.CouponCampaignCreated();      
+      compaignCreate1.watch(async function(err1, result1){
+      compaignCreate1.stopWatching();             
+      if(err1){
+        console.log(err1);
+        return done(err1);
+      }
+      var compaignId1 = result1.args.newCouponId;
+      //console.log('Compaign Id1:', compaignId1.toNumber());
+        try{
+          await sale.addCoupon2Compaign(compaignId1,coupons1);
+          throw(1);
+        }catch(err)
+        {
+          if(err==1)
+            assert(false,'coupon id should be unique for every compaign.Not Handled.');
+        }
+      })
+    }) 
+    done();
+   }catch(err) {
+     assert(false, 'couponCompaign failed.');
+   }   
+  });
+
+  it("owner/admin/founders not allowed for Coupom compaign.",function (done) {
+    try {
+      sale.createCouponCompaign(1000 *(10**18));
+   
+      var compaignCreate = sale.CouponCampaignCreated();      
+      compaignCreate.watch(async function(err, result){
+      compaignCreate.stopWatching();             
+      if(err){
+        console.log(err);
+        return done(err);
+      }
+      var newCouponId = result.args.newCouponId;
+      //console.log('Compaign Id:', newCouponId.toNumber());
+      await sale.addCoupon2Compaign(newCouponId,coupons);
+      await sale.activateCouponCompaign(newCouponId);
+      try{
+       await sale.redeemCoupon(coupons[0],owner);
+       throw(1);
+      }catch(err)
+      {
+        if(err == 1)
+         assert(false,'coupon campaign program not allowed for owner/founders. but not handled here.')
+      }
+      //var tknBalanceOf4= await token.balanceOf(buyer2);
+      //console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
       done();
       })        
       }catch(err) {
