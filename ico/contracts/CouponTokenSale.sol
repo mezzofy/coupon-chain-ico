@@ -127,7 +127,6 @@ contract CouponTokenSale is Pausable {
         uint256 rateInCents;
         uint256 poolBonus;
         uint256 soldTokens;
-        uint256 totalCentsRaised;
         mapping(address => BuyerInfoForPoolBonus) buyerInfo;
         address[] buyersList;
         uint256 cumulativeBonusTokens;
@@ -418,14 +417,17 @@ contract CouponTokenSale is Pausable {
 
         address purchaser = msg.sender;
         uint256 contributionInWei = msg.value;
-        uint256 contributioninEth = contributionInWei.div(10 ** uint256(decimals));
-        uint256 inCents = contributioninEth.mul(rateEth2Cents);
+        uint256 inCents = contributionInWei.mul(rateEth2Cents);
 
-        uint256 totalTokens = purchase(purchaser, inCents);
+         // Find no.of tokens to be purchased
+        uint256 purchaseTokens = inCents.div(lotsInfo[currLot].rateInCents);
+
+        // Call purchase function
+        purchase(purchaser, purchaseTokens);
 
         // Transfer contributions to fund address
         fundAddr.transfer(contributionInWei);
-        emit TokenPurchase(msg.sender, contributionInWei, totalTokens);
+        emit TokenPurchase(msg.sender, contributionInWei, purchaseTokens);
 
         return true;
     }
@@ -437,18 +439,20 @@ contract CouponTokenSale is Pausable {
         atStage(Stages.Started)
         returns (bool) {
 
+        // Find no.of tokens to be purchased
+        uint256 purchaseTokens = inCents.mul(10 ** uint256(decimals)).div(lotsInfo[currLot].rateInCents);
+
         // Call purchase()    
-        purchase(toUser, inCents);
+        purchase(toUser, purchaseTokens);
 
         return true;
     }
 
-    function purchase(address purchaser, uint256 inCents)
-        internal 
-        returns (uint256) {
+    function purchase(address purchaser, uint256 purchaseTokens)
+        internal {
         
         // Find no.of tokens to be purchased
-        uint256 purchaseTokens = inCents.mul(10 ** uint256(decimals)).div(lotsInfo[currLot].rateInCents);
+        //uint256 purchaseTokens = inCents.mul(10 ** uint256(decimals)).div(lotsInfo[currLot].rateInCents);
         
         // Check sufficient tokens available in this lot
         uint256 availableTokens = lotsInfo[currLot].totalTokens - lotsInfo[currLot].soldTokens;
@@ -472,7 +476,7 @@ contract CouponTokenSale is Pausable {
             
         // Add it to Lot Information
         lotsInfo[currLot].soldTokens = lotsInfo[currLot].soldTokens.add(purchaseTokens);
-        lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
+        //lotsInfo[currLot].totalCentsRaised = lotsInfo[currLot].totalCentsRaised.add(inCents);
 
         // See if the buyer is already in our list, add it if not
         uint256 oldTokens = lotsInfo[currLot].buyerInfo[purchaser].noOfTokensBought;
@@ -527,8 +531,6 @@ contract CouponTokenSale is Pausable {
             // Decrease the total
             remainingReferralTokens = remainingReferralTokens.sub(referralTokensNeeded);
         }
-
-        return purchaseTokens;
     }
 
 
