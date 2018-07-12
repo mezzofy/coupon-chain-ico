@@ -845,6 +845,9 @@ contract CouponTokenSale is Pausable {
         // Subtract it from the Remaining tokens
         remainingBountyTokens = remainingBountyTokens.sub(bountyTokens);
 
+        // Mark this coupon as redeemed
+        couponInfo[couponId].redeemed = true;
+        
         couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == true;
     }
 
