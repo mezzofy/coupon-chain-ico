@@ -167,7 +167,7 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
     var tokens=  2500000001 * (10 ** 18); //250 million.
 
     try {
-        await sale.airDrop(airDroppers,token);
+        await sale.airDrop(airDroppers,tokens);
         throw(1);
       }catch(err) {
         if(err==1)
@@ -217,7 +217,6 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
       assert(false,'airDrop successfully done. But tokens not available into users.')
   });
 });
-
 
 contract("Coupon Coin Token buyFiat & calculatePoolBonus Test",(accounts)=>{
 
@@ -614,6 +613,7 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
     }   
   });
 
+
   it("*** NOT YET COMPLETED **** coupon redeem works for the given compaign.",function (done) {
     try {
        sale.createCouponCompaign(1000 *(10**18));
@@ -652,7 +652,6 @@ contract("Coupon Coin Token createCouponCampaign Test",(accounts)=>{
       }catch(err){
         assert(false,'couponcompaign error.');
      }  
-
    });
  
 
@@ -941,5 +940,122 @@ contract("Coupon Coin Token addReferrer Test",(accounts)=>{
           assert(false, 'owner only call this function. validation not handled.');
     }   
   }); 
+
+});
+
+contract("Coupon Coin Token buy Test",(accounts)=>{
+
+  const owner = accounts[0];
+  const admin = accounts[1];
+  const fund = accounts[2];
+  const user = accounts[3];
+
+  let token = null;
+  let sale = null;
+  let sale1=null;
+
+  beforeEach("setup contract for each test", async()=>{
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();
+  });  
+
+  it("buy should transfer tokens to the user",async()=>{
+    try{
+      web3.eth.getBalance(accounts[5], function(err,res){
+        console.log(res/(10**18)); 
+      });  
+      await sale.sendTransaction({ value: web3.toWei(1, 'ether'), from: accounts[5] });
+      web3.eth.getBalance(accounts[5], function(err,res){
+        console.log(res/(10**18)); 
+      });  
+      var tknBalanceOf4= await token.balanceOf(accounts[5]);
+      console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+    }catch(err)
+    {
+      assert(false,'Sendtransaction/buy failed.buy not working properly.');
+    }
+  });
+});
+contract("Coupon Coin Token endSale Test",(accounts)=>{
+  const owner = accounts[0];
+  const admin = accounts[1];
+  const fund = accounts[2];
+  const user = accounts[3];
+
+  var buyer1 = accounts[6];
+  var buyer2 = accounts[7];
+  var buyer3 = accounts[8];
+  var buyer4 = accounts[9];
+
+  var BountyTotalTokens = 15000000;
+  var cents1= 6 * 30000000; // 30 million
+  var cents2= 7 * 60000000; // 60 million
+  var cents3= 8 * 90000000; // 90 million
+  var cents4= 9 *120000000; // 120 million    
+
+  let token = null;
+  let sale = null;
+
+  beforeEach("setup contract for each test", async () => {
+    token = await CCTCoin.new({from: owner });
+    sale = await CCTCoinSale.new( token.address, { from: owner });
+    await token.setCouponTokenSale(sale.address);
+    await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
+    await sale.setEth2Cents(45000);
+    await sale.startSale();
+
+    await sale.createBounty(100*(10**18)); 
+  });
+
+  it("endsale validation",function (done){
+    try {
+      sale.createBounty(1000*(10**18));
+      var bountyCreate = sale.BountyCreated();      
+      bountyCreate.watch(async function(err, result){
+        bountyCreate.stopWatching();             
+        if(err){
+          console.log(err);
+          return done(err);
+        }
+        await sale.buyFiat(buyer1,cents1);
+        await sale.buyFiat(buyer2,cents2);
+  
+        var newBountyId = result.args.newBountyId;
+        sale.activateBounty(newBountyId);
+        var bountyremaining = await sale.remainingBountyTokens();
+        if(BountyTotalTokens == bountyremaining)
+          assert(false,'Bounty Program error.Bounty token balance handled properly.');
+        sale.fullfillmentBounty(newBountyId,buyer1);
+        sale.fullfillmentBounty(newBountyId,buyer2);
+        tknBalanceOf4= await token.balanceOf(buyer1);
+        console.log('User 1 Balance:',tknBalanceOf4.toNumber()/(10**18));
+        tknBalanceOf5=await token.balanceOf(buyer2);
+        console.log('User 2 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+         await sale.buyFiat(buyer3,cents3);
+        await sale.buyFiat(buyer4,cents4);
+
+        tknBalanceOf4= await token.balanceOf(buyer3);
+        console.log('User 3 Balance:',tknBalanceOf4.toNumber()/(10**18));
+        tknBalanceOf5=await token.balanceOf(buyer4);
+        console.log('User 4 Balance:',tknBalanceOf5.toNumber()/(10**18));
+
+        var treassuryBalance = await token.balanceOf(accounts[3]);
+        console.log('Treassury Remaining Before endSale:',treassuryBalance.toNumber()/(10**18));
+        await sale.endSale();
+        treassuryBalance = await token.balanceOf(accounts[3]);
+        console.log('Treassury Remaining After endSale :',treassuryBalance.toNumber()/(10**18));
+        done();
+      })        
+     }catch(err) {
+        assert(false, 'createBounty Failed');
+    }   
+  });  
+
 
 });
