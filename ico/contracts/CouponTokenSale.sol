@@ -7,18 +7,9 @@ import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
 contract CouponTokenSale is Pausable {
     using SafeMath for uint256;
 
-    // Start time of Sale
-    uint256 public startSaleTime;
-
-    // Start time of the Sale-lot 4
-    uint256 public startTimeOfSaleLot4;
-
-    // End time of Sale
-    uint256 public endSaleTime;
-
-    // Flag to mark endSales
-    bool private endSalesFlag;
-
+    // Set the Sales start/end flags
+    bool public startSalesFlag;
+    bool public endSalesFlag;
 
     uint256 private rateEth2Cents;
 
@@ -34,13 +25,17 @@ contract CouponTokenSale is Pausable {
     // Coupon Token contract address
     CouponToken public couponToken;
 
+    // addresses to store bounty and couponCampaign
+    address private bountyAddr;
+    address private couponCampaignAddr;
+
     // Amount of raised in Wei (1 ether)
     uint256 public totalWeiRaised;
 
     // TreasuryTokens
     uint256 public remainingTreasuryTokens;
 
-    // Compaigns Tokens
+    // Campaigns Tokens
     uint256 public remainingAirDropTokens;
     uint256 public remainingBountyTokens;
     uint256 public remainingCouponTokens;
@@ -131,38 +126,10 @@ contract CouponTokenSale is Pausable {
         address[] buyersList;
         uint256 cumulativeBonusTokens;
         bool poolBonusCalculated;
-    }
-
-    struct UserInfoForCampaign {
-        bool fullfillmentDone;
-        uint256 bonusTokensAlotted;
-    }
-
-    struct EventData {
-        uint256 tokensForEvent;
-        bool activated;
-        bool killed;
-        uint32 noOfCouponsAdded; // Only applicable for CouponCampaign
-        mapping (address => UserInfoForCampaign) userInfoForCampaign;
-    }
-
-    struct CouponCampaignInfo {
-        uint32 campaignId;
-        bool added;
-        bool redeemed;
+        uint256 bonusTokens;
     }
 
     
-    // Event Data for Bounty Program
-    uint32 bountyIndex;
-    mapping(uint32 => EventData) bountyProgram;
-
-    // Event-data for Coupon Bonus Program
-    uint32 couponCampaignIndex;
-    mapping(uint32 => EventData) couponCampaignProgram;
-
-    // Coupons mapping
-    mapping(bytes32 => CouponCampaignInfo) couponInfo;
 
     // Mappings for Referrals
     mapping(address => address) referrals;
@@ -170,20 +137,29 @@ contract CouponTokenSale is Pausable {
     // List of Lots information
     mapping(uint8 => LotInfos) lotsInfo;
 
-     // List for Founders
-    mapping(address => uint256) founders;
-
     /*
      * Events
      */
-      /*
+
+    /*
      * Event for sale start logging
      *
      * @param startTime: Start date of sale
-     * @param endTime: End date of sale
      *
      */
     event SaleStarted(uint256 startTime);
+
+    /*
+     * Event for sale end logging
+     *
+     * @param endTime: End date of sale
+     *
+     */
+    event SaleEnded(uint256 endTime);
+
+    event SetEth2Cents(uint rate);
+
+
 
     /*
      * Event for token purchase
@@ -195,10 +171,6 @@ contract CouponTokenSale is Pausable {
     event TokenPurchase(address indexed purchaser, uint256 value, uint256 amount);
 
 
-    event BountyCreated(uint32 newBountyId);
-
-    event CouponCampaignCreated(uint32 newCouponId);
-
     /*
      * Modifiers
      */
@@ -208,19 +180,20 @@ contract CouponTokenSale is Pausable {
     }
 
     modifier onlyValidPurchase() {
-        require(now >= startSaleTime);
-
-        address purchaser = msg.sender;
-
-        require(purchaser != address(0));
-
+        require(msg.sender != address(0));
         _;
     }
 
-    modifier onlyCallFromCouponToken {
-        require(msg.sender == address(couponToken));
+    modifier onlyCallFromBounty {
+        require(msg.sender == bountyAddr);
         _;
     }
+
+    modifier onlyCallFromCouponCampaign {
+        require(msg.sender == couponCampaignAddr);
+        _;
+    }
+   
 
     /*
      * Constructor
@@ -305,7 +278,7 @@ contract CouponTokenSale is Pausable {
      *
      */
     function addFounders(address[] Users, uint256[] Tokens)
-        public 
+        external 
         onlyOwner 
         atStage(Stages.Setup) {
 
@@ -329,15 +302,8 @@ contract CouponTokenSale is Pausable {
         
         // Total tokens should be more than CAP
         require(totalFounderAllocation <= MAX_CAP_FOR_FOUNDERS);
-        
-        // Allocation for founders 
-        for(i = 0; i < Users.length; i++) { 
-            // Assign tokens
-            founders[Users[i]] = Tokens[i];
 
-            // Mint the required tokens
-            couponToken.mint(Users[i], Tokens[i]);
-        }
+        couponToken.addFounders(Users, Tokens);
     }
 
 
@@ -351,6 +317,8 @@ contract CouponTokenSale is Pausable {
 
         rateEth2Cents = rate;
 
+        emit SetEth2Cents(rate);
+
     }
 
     /*
@@ -361,14 +329,14 @@ contract CouponTokenSale is Pausable {
         onlyOwner
         atStage(Stages.Setup)
     {
-        require(rateEth2Cents >= 0);
+        require(rateEth2Cents > 0);
         
         stage = Stages.Started;
         currLot = SALE_LOT1;
-        startSaleTime = now;
+        startSalesFlag = true;
 
         // Fire the event
-        emit SaleStarted(startSaleTime);
+        emit SaleStarted(now);
     }
 
      /*
@@ -397,12 +365,14 @@ contract CouponTokenSale is Pausable {
 
         // Check if sale already end by purchase
         if(stage == Stages.Started) {
-            endSaleTime = now;
+            couponToken.setSalesEndTime(now);
             stage = Stages.Ended;
+            emit SaleEnded(now);
         }
 
         endSalesFlag = true;
     }
+
 
     /*
      * Function: buy()
@@ -417,7 +387,7 @@ contract CouponTokenSale is Pausable {
 
         address purchaser = msg.sender;
         uint256 contributionInWei = msg.value;
-        uint256 inCents = contributionInWei.mul(rateEth2Cents);
+        uint256 inCents = contributionInWei.mul(rateEth2Cents); // in units of 10^18
 
          // Find no.of tokens to be purchased
         uint256 purchaseTokens = inCents.div(lotsInfo[currLot].rateInCents);
@@ -507,12 +477,13 @@ contract CouponTokenSale is Pausable {
 
             // See now it is in Lot 4
             if(currLot == SALE_LOT4)
-                startTimeOfSaleLot4 = now;
+                couponToken.setSaleLot4StartTime(now);
 
             if(currLot == MAX_SALE_LOTS) {
                 // All sale lots completed, so end the sale
-                endSaleTime = now;
+                couponToken.setSalesEndTime(now);
                 stage = Stages.Ended;
+                emit SaleEnded(now);
             } 
         }
 
@@ -524,13 +495,19 @@ contract CouponTokenSale is Pausable {
             uint256 referralTokensNeeded = purchaseTokens * 5 / 100;    // 5%
             if(remainingReferralTokens >= referralTokensNeeded) {
                 // 4% to referree and 1% to purchaser
-                couponToken.mint(referrals[purchaser], (purchaseTokens * 4 / 100));
+                uint256 bonusReferral = purchaseTokens * 4 / 100;
+                couponToken.mint(referrals[purchaser], bonusReferral);
                 couponToken.mint(purchaser, (purchaseTokens * 1 / 100));
+                couponToken.setUserwhoGotBonus(referrals[purchaser], bonusReferral);
             }
 
             // Decrease the total
             remainingReferralTokens = remainingReferralTokens.sub(referralTokensNeeded);
         }
+
+        // Update buyer to CouponToken contract to calculate vesting period(only for Sale-lot1 to Sale-lot3)
+        if(currLot != SALE_LOT4)
+            couponToken.setUserwhoPurchasedinLot1to3(purchaser, purchaseTokens);
     }
 
 
@@ -563,6 +540,9 @@ contract CouponTokenSale is Pausable {
                     // Allot bonus tokens                    
                     buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
                     
+                    // Add it to LotInfo as well(for reporting purpose)
+                    lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
+
                     // Mint the required tokens
                     couponToken.mint(addr, buyerInfo.bonusTokensAlotted);
                 }           
@@ -601,257 +581,62 @@ contract CouponTokenSale is Pausable {
                 users[i] != fundAddr && 
                 users[i] != treasuryAddr &&
                 users[i] != contigencyAddr &&
-                founders[users[i]] == 0);
+                !couponToken.IsFounder(users[i]) );
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
+            couponToken.setUserwhoGotBonus(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
     }
 
     /*
-     *
-     * Function: createBounty()
-     *
-    */
-    function createBounty(uint256 noOfTokens)
-        external
-        onlyOwner
-        atStage(Stages.Started) {
-
-        // Condition
-        require(noOfTokens > 0 && remainingBountyTokens >= noOfTokens);
-
-        // Generate new event id
-        uint32 newEventId = bountyIndex;
-        bountyIndex++;
-
-        bountyProgram[newEventId].tokensForEvent = noOfTokens;
-
-        emit BountyCreated(newEventId);
-    }
-
-    /*
-     *
-     * Function: killBounty()
-     *
-    */
-    function killBounty(uint32 bountyId)
-        external
-        onlyOwner
-        atStage(Stages.Started) 
-        returns (uint32) {
-        
-        require(
-            bountyId < bountyIndex &&
-            bountyProgram[bountyId].killed == false);
-
-        bountyProgram[bountyId].killed = true;
-
-    }
-
-    /*
-     *
-     * Function: activateBounty()
-     *
-    */
-    function activateBounty(uint32 bountyId)
-        external
-        onlyOwner
-        atStage(Stages.Started) {
-
-        require(
-            bountyId < bountyIndex &&
-            bountyProgram[bountyId].activated == false && 
-            bountyProgram[bountyId].killed == false);
-
-        bountyProgram[bountyId].activated = true;
-    }
-
-    
-
-
-    /*
-     *
-     * Function: fullfillmentBounty()
-     *
-    */
-    function fullfillmentBounty(uint32 bountyId, address user)
-        external 
-        onlyOwner
-        atStage(Stages.Started) {
-
-        // user should not be empty, founder, owner, treasury, contigency address
-        require(
-            user != address(0x0) &&
-            user != owner &&
-            user != fundAddr && 
-            user != treasuryAddr &&
-            user != contigencyAddr &&
-            founders[user] == 0);
-
-        // Condition
-        require(remainingBountyTokens >= bountyProgram[bountyId].tokensForEvent);
-
-        require(
-            bountyId < bountyIndex &&
-            bountyProgram[bountyId].activated == true && 
-            bountyProgram[bountyId].killed == false);
-
-        // This user should not be fullfilement done already
-        require(bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == false);
-
-        uint256 bountyTokens = bountyProgram[bountyId].tokensForEvent;
-
-         // Mint the required tokens
-        couponToken.mint(user, bountyTokens);
-
-        // Subtract it from the Remaining tokens
-        remainingBountyTokens = remainingBountyTokens.sub(bountyTokens);
-
-        bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
-    }
-
-    /*
-     *
-     * Function: createCoupon()
-     *
-    */
-    function createCouponCompaign(uint256 noOfTokens)
-        external
-        onlyOwner
-        atStage(Stages.Started) 
-        returns (uint32) {
-
-        // Condition
-        require(remainingCouponTokens >= noOfTokens);
-
-        // Generate new event id
-        uint32 newCouponId = couponCampaignIndex;
-        couponCampaignIndex++;
-
-        couponCampaignProgram[newCouponId].tokensForEvent = noOfTokens;
-
-        emit CouponCampaignCreated(newCouponId);
-    }
-    
-     /*
-     *
-     * Function: killCoupon()
-     *
-    */
-    function killCouponCompaign(uint32 compaignId)
-        external
-        onlyOwner
-        atStage(Stages.Started) 
-        returns (uint32) {
-        
-        require(
-            compaignId < couponCampaignIndex && 
-            couponCampaignProgram[compaignId].killed == false);
-
-        couponCampaignProgram[compaignId].killed = true;
-
-    }
-
-    /*
-     *
-     * Function: addCoupon2Compaign()
+     * 
+     * Function: setBountyAddr()
      *
      */
-    function addCoupon2Compaign(uint32 compaignId, bytes32[] coupons) 
+    function setBountyAddr(address _bountyAddr) 
         external
-        onlyOwner
-        atStage(Stages.Started) {
-
-        require(
-            compaignId < couponCampaignIndex && 
-            coupons.length > 0);
-
-        // Check for duplicate coupons
-        for(uint32 i = 0; i < coupons.length; i++) {
-            require(couponInfo[coupons[i]].added == false);
-        }
-
-        // Add the coupons
-        for(i = 0; i < coupons.length; i++) {
-            couponInfo[coupons[i]].campaignId = compaignId;
-            couponInfo[coupons[i]].added = true;
-        }
-
-        // Set no.of coupons
-        couponCampaignProgram[compaignId].noOfCouponsAdded = uint32(coupons.length);
-
+        onlyOwner {
+        bountyAddr = _bountyAddr;
     }
 
     /*
-     *
-     * Function: activateCouponCompaign()
+     * 
+     * Function: setBountyAddr()
      *
      */
-    function activateCouponCompaign(uint32 CompaignId)
+    function setCampaignAddr(address _campaignAddr) 
         external
-        onlyOwner
-        atStage(Stages.Started) {
+        onlyOwner {
+        couponCampaignAddr = _campaignAddr;
+    }
 
-        require(
-            CompaignId < couponCampaignIndex && 
-            couponCampaignProgram[CompaignId].activated == false && 
-            couponCampaignProgram[CompaignId].killed == false);
 
-        couponCampaignProgram[CompaignId].activated = true;
+    /*
+     * 
+     * Function: subtractBountyTokens()
+     *
+     */
+    function subtractBountyTokens(uint256 noOfTokens)
+        external 
+        onlyCallFromBounty {
+        remainingBountyTokens = remainingBountyTokens.sub(noOfTokens);
+    }
+
+    /*
+     * 
+     * Function: subtractCampaignTokens()
+     *
+     */
+    function subtractCampaignTokens(uint256 noOfTokens)
+        external 
+        onlyCallFromCouponCampaign {
+        remainingCouponTokens = remainingCouponTokens.sub(noOfTokens);
     }
 
     
-
-    /*
-     *
-     * Function: redeemCoupon()
-     *
-    */
-    function redeemCoupon(bytes32 couponId, address user)
-        external 
-        onlyOwner
-        atStage(Stages.Started) {
-
-        // user should not be empty, founder, owner, treasury, contigency address
-        require(
-            user != address(0x0) &&
-            user != owner &&
-            user != fundAddr && 
-            user != treasuryAddr &&
-            user != contigencyAddr &&
-            founders[user] == 0);
-
-        // Coupon should be added already and not redeemed
-        require(couponInfo[couponId].added == true && couponInfo[couponId].redeemed == false);
-
-        // Sufficient tokens available?
-        uint32 campaignId = couponInfo[couponId].campaignId;
-        require(remainingBountyTokens >= couponCampaignProgram[campaignId].tokensForEvent);
-
-        require(
-            campaignId < couponCampaignIndex &&
-            couponCampaignProgram[campaignId].activated == true && 
-            couponCampaignProgram[campaignId].killed == false);
-
-        // This user should be participated already and fullfilement not done
-        require(couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == false);
-
-        uint256 bountyTokens = couponCampaignProgram[campaignId].tokensForEvent;
-
-        // Mint the required tokens
-        couponToken.mint(user, bountyTokens);
-
-        // Subtract it from the Remaining tokens
-        remainingBountyTokens = remainingBountyTokens.sub(bountyTokens);
-
-        // Mark this coupon as redeemed
-        couponInfo[couponId].redeemed = true;
-        
-        couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == true;
-    }
 
     /*
      *
@@ -870,7 +655,7 @@ contract CouponTokenSale is Pausable {
             user != fundAddr && 
             user != treasuryAddr &&
             user != contigencyAddr &&
-            founders[user] == 0);
+            !couponToken.IsFounder(user));
 
         // referredBy should not be empty, founder, owner, treasury, contigency address
         require(
@@ -879,7 +664,7 @@ contract CouponTokenSale is Pausable {
             referredBy != fundAddr && 
             referredBy != treasuryAddr &&
             referredBy != contigencyAddr &&
-            founders[referredBy] == 0);
+            !couponToken.IsFounder(referredBy));
         
         referrals[user] = referredBy;
     }
@@ -891,85 +676,79 @@ contract CouponTokenSale is Pausable {
     //
     //
     //*************************************************************************/
-
-    function IsFounderVestingPeriodOver(address user)
+    function IsPrivateAddress(address user) 
         external view
-        onlyCallFromCouponToken
         returns (bool) {
 
-        bool retVal = true;
-        if(founders[user] > 0 && now < (endSaleTime + 730 days)) // 2 years
-            retVal = false;            
-
-        return retVal;
+        return (
+            user == fundAddr ||
+            user == treasuryAddr ||
+            user == contigencyAddr
+        );
     }
 
-    /*
+    /*************************************************************************
      *
-     * Function: IsUserParticipatedinLot1to3Sales()
      *
-    */
-    function IsUserParticipatedinLot1to3Sales(address user) 
-        private view
-        returns (bool){
-
-        bool retVal = false;
-
-        if(lotsInfo[SALE_LOT1].buyerInfo[user].noOfTokensBought > 0 ||
-            lotsInfo[SALE_LOT2].buyerInfo[user].noOfTokensBought > 0 ||
-            lotsInfo[SALE_LOT3].buyerInfo[user].noOfTokensBought > 0)
-            retVal = true;
-
-        return retVal;
-    }
-
-    function IsUserVestingPeriodOver(address user)
+     *  F u n c t i o n s   f o r   D a s h b o a r d   A c c e s s 
+     *
+     *
+    *************************************************************************/
+    function dashboardGetAllIssuedTokens() 
         external view
-        onlyCallFromCouponToken
-        returns (bool) {
+        returns (uint256 tokenSold, uint256 tokenBonus, uint256 tokenAirDrop, 
+        uint256 tokenBounty, uint256 tokenCampaign, uint256 tokenReferral) {
+
+        //
+        // Calculate return values
+        tokenSold = lotsInfo[SALE_LOT1].soldTokens + lotsInfo[SALE_LOT2].soldTokens + 
+        lotsInfo[SALE_LOT3].soldTokens + lotsInfo[SALE_LOT4].soldTokens;
+
+        tokenBonus = lotsInfo[SALE_LOT1].bonusTokens + lotsInfo[SALE_LOT2].bonusTokens + 
+        lotsInfo[SALE_LOT3].bonusTokens + lotsInfo[SALE_LOT4].bonusTokens;
+
+        tokenAirDrop = (MAX_CAP_AIRDROP_PROGRAM - remainingAirDropTokens);
+        tokenBounty = (MAX_CAP_BOUNTY_PROGRAM - remainingBountyTokens);
+        tokenCampaign = (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
+        tokenReferral = (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens);
+    }
+
+    function dasboardGetCurrentSaleLot() 
+        external view
+        atStage(Stages.Started) 
+        returns (uint8) {
         
-        // See the user participated in lots 1,2 3, if so
-        // he can't do the transfer till the vesting period over
+        // Return current Sale Lot number
+        return currLot; // Change it to 1 based index
+    }
 
-        bool retVal = true;
-        if(IsUserParticipatedinLot1to3Sales(user) == true && now < (startTimeOfSaleLot4 + 90 days))  // 3 months
-            retVal = false;            
+    function dashboardGetSaleLotSales(uint8 lotNumber)  // Input is 1 based index
+        external view
+        atStage(Stages.Started) 
+        returns (uint256) {
 
-        return retVal;
+        require(lotNumber >= SALE_LOT1 && lotNumber <= SALE_LOT4);
+
+        return lotsInfo[lotNumber].soldTokens;
+
     }
 
 
-    // function TestFunc(uint256 inWei) public view
-    //     returns (uint256) {
-    //     uint256 contributionInWei = inWei;
-    //     uint256 contributioninEth = contributionInWei.div(10 ** uint256(decimals));
-    //     uint256 inCents = contributioninEth.mul(rateEth2Cents);
-    //     uint256 noOfTokens = inCents.div(lotsInfo[uint8(currLot)].rateInCents);
+    function dashboardGetPurchasedTokensAndBonus(address user)
+        external view
+        returns (uint256 tokensPurchased, uint256 tokensBouns) {
 
-    //     return noOfTokens;
-    // }
+        // Calculate Purchased tokens
+        tokensPurchased = lotsInfo[SALE_LOT1].buyerInfo[user].noOfTokensBought +
+        lotsInfo[SALE_LOT2].buyerInfo[user].noOfTokensBought +
+        lotsInfo[SALE_LOT3].buyerInfo[user].noOfTokensBought +
+        lotsInfo[SALE_LOT4].buyerInfo[user].noOfTokensBought;
 
-    // function TestSign() public pure returns (int8) {
-    //     uint8 a = 1;
-    //     uint8 b = 2;
-    //     return int8(a-b);
-    // }
+        // Calculate Bouns tokens
+        tokensBouns = lotsInfo[SALE_LOT1].buyerInfo[user].bonusTokensAlotted +
+        lotsInfo[SALE_LOT2].buyerInfo[user].bonusTokensAlotted +
+        lotsInfo[SALE_LOT3].buyerInfo[user].bonusTokensAlotted +
+        lotsInfo[SALE_LOT4].buyerInfo[user].bonusTokensAlotted;
+    }
 
-    // function getTime() public view returns (uint256) {
-    //     return now;
-    // }
-
-    // function TestFunc() external returns (uint32) {
-    //     //return 1 minutes;
-    //    // Generate new event id
-    //     bountyIndex++;
-    //     EventData storage e = bountyProgram[bountyIndex];
-
-    //     e.tokensForEvent = 100;
-    //     e.activated = true;
-
-        
-    //     return bountyIndex;
-    // }
-    
 }
