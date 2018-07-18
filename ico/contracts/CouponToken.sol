@@ -5,8 +5,10 @@ import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 //import "openzeppelin-solidity/contracts/token/ERC20/MintableToken.sol";
 
+import "./CouponTokenConfig.sol";
+
 //contract CouponToken is MintableToken {
-contract CouponToken is StandardToken, Ownable {
+contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
     using SafeMath for uint256;
 
     // Start time of the Sale-lot 4
