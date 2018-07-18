@@ -84,6 +84,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      * Event for sale start logging
      *
      */
+    event FounderAdded(address indexed founder, uint256 tokens);
+    
     event EventCrowdSale(string msg);
 
     event SetEth2Cents(uint rate);
@@ -231,7 +233,18 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Total tokens should be more than CAP
         require(totalFounderAllocation <= MAX_CAP_FOR_FOUNDERS);
 
-        couponToken.addFounders(Users, Tokens);
+         // Allocation for founders 
+        for(i = 0; i < Users.length; i++) { 
+            
+            // Mint the required tokens
+            couponToken.mint(Users[i], Tokens[i]);
+
+            // Set this user as Founder for Vesting period checking
+            couponToken.setFounderUser(Users[i]);
+
+            // Emit the event
+            emit FounderAdded(Users[i], Tokens[i]);
+        }
     }
 
 
@@ -272,9 +285,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      */
     function endSale() 
         external
-        onlyOwner 
-        atStage(Stages.Started)
-        {
+        onlyOwner {
 
         // Flag to prevent the second call of this function
         require(endSalesFlag == false);
@@ -514,6 +525,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
+
+            // Set this user as bonus alloted
+            couponToken.setBonusUser(users[i]);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);

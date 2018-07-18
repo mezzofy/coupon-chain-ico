@@ -3,7 +3,6 @@ pragma solidity ^0.4.21;
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-//import "openzeppelin-solidity/contracts/token/ERC20/MintableToken.sol";
 
 import "./CouponTokenConfig.sol";
 
@@ -26,18 +25,15 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
     // Address of CouponTokenCampaign contract
     address public couponTokenCampaignAddr;
 
-    // List for Vesting Batch 1-Founders 2-Sales & Bouns Users
-    mapping(uint8 => uint256) vestingbatch;
 
     // List of User for Vesting Period 
-    mapping(address => uint8) vestingusers;
+    mapping(address => uint8) vestingUsers;
 
     /*
      *
      * E v e n t s
      *
      */
-    event FounderAdded(address indexed founder, uint256 tokens);
     event Mint(address indexed to, uint256 tokens);
 
     /*
@@ -47,7 +43,10 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
      */
 
     modifier canMint() {
-        require(owner == msg.sender || couponTokenSaleAddr == msg.sender);
+        require(
+            couponTokenSaleAddr == msg.sender ||
+            couponTokenBountyAddr == msg.sender ||
+            couponTokenCampaignAddr == msg.sender);
         _;
     }
 
@@ -93,6 +92,8 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
    */
     function mint(address _to, uint256 _amount) canMint public {
         
+        require(totalSupply_.add(_amount) <= TOTAL_COUPON_SUPPLY);
+
         totalSupply_ = totalSupply_.add(_amount);
         balances[_to] = balances[_to].add(_amount);
         emit Mint(_to, _amount);
@@ -139,26 +140,11 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
         couponTokenCampaignAddr = _couponTokenCampaignAddr;
     }
 
-    function addFounders(address[] _users, uint256[] _tokens) 
-        external 
-        onlyCallFromCouponTokenSale {
-         // Allocation for founders 
-        for(uint i = 0; i < _users.length; i++) { 
-            // Assign under vesting user founder batch
-             vestingusers[_users[i]] = 1;
-
-            // Mint the required tokens
-            mint(_users[i], _tokens[i]);
-
-            // Emit the event
-            emit FounderAdded(_users[i], _tokens[i]);
-        }
-    }
-
+   
     function IsFounder(address user)
         external view
         returns(bool) {
-        return (vestingusers[user] == 1);
+        return (vestingUsers[user] == USER_FOUNDER);
     }
 
     function setSalesEndTime(uint256 _endSaleTime) 
@@ -174,21 +160,35 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
     }
 
 
+    function setFounderUser(address _user)
+        public
+        onlyCallFromCouponTokenSale {
+        // Add vesting user as Founder
+        vestingUsers[_user] = USER_FOUNDER;
+    }
+
     function setSalesUser(address _user)
         public
-        onlyOwner {
+        onlyCallFromCouponTokenSale {
         // Add vesting user under sales purchase
-        vestingusers[_user] = 1;
+        vestingUsers[_user] = USER_BUYER;
+    }
+
+    function setBonusUser(address _user) 
+        public
+        onlyCallFromTokenSaleOrBountyOrCampaign {
+        // Set this user as who got bonus
+        vestingUsers[_user] = USER_BONUS;
     }
 
     function isTransferAllowed(address _user)
         internal view
         returns (bool) {
         bool retVal = true;
-        if(vestingusers[_user] > 0 ){
-            if(vestingusers[_user] == 1 && (now < (endSaleTime + 730 days))) // 2 years
+        if(vestingUsers[_user] != USER_NONE ){
+            if(vestingUsers[_user] == USER_FOUNDER && (now < (endSaleTime + 730 days))) // 2 years
                 retVal = false;
-            if(vestingusers[_user] == 2 && (now >= (startTimeOfSaleLot4 + 90 days)))
+            if((vestingUsers[_user] == USER_BUYER || vestingUsers[_user] == USER_BONUS) && (now >= (startTimeOfSaleLot4 + 90 days)))
                 retVal = false;
         }
         return retVal;
