@@ -153,8 +153,6 @@ contract CouponTokenBounty {
 
          // Mint the required tokens
         couponToken.mint(user, bountyTokens);
-        // Set this user as bonus alloted
-        couponToken.setUserwhoGotBonus(user, bountyTokens);
 
         // Subtract it from the Remaining tokens
         couponTokenSale.subtractBountyTokens(bountyTokens);

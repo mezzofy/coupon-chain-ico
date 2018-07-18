@@ -204,8 +204,6 @@ contract CouponTokenCampaign {
 
         // Mint the required tokens
         couponToken.mint(user, campaignTokens);
-        // Set this user as bonus alloted
-        couponToken.setUserwhoGotBonus(user, campaignTokens);
 
         // Subtract it from the Remaining tokens
         couponTokenSale.subtractCampaignTokens(campaignTokens);

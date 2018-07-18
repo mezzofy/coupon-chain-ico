@@ -1,10 +1,11 @@
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.21;
 
-import "./CouponToken.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
+import "./CouponToken.sol";
+import "./CouponTokenSaleConfig.sol";
 
-contract CouponTokenSale is Pausable {
+contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     using SafeMath for uint256;
 
     // Set the Sales start/end flags
@@ -40,68 +41,6 @@ contract CouponTokenSale is Pausable {
     uint256 public remainingBountyTokens;
     uint256 public remainingCouponTokens;
     uint256 public remainingReferralTokens;
-
-    /*
-     *
-     * C O N S T A N T S
-     *
-    */
-    uint8 public constant decimals = 18;
-
-    // Total coupon supply, 1 billion
-    uint256 public constant TOTAL_COUPON_SUPPLY = 1000000000 * (10 ** uint256(decimals)); // 1 billion
-    
-    // Coupon Sale Allowance for Crowd Sales, 300 million
-    uint256 public constant TOKEN_SALE_ALLOWANCE =  300000000 * (10 ** uint256(decimals)); // 300 million
-    
-    // Maximum CAP for founders, 100 million
-    uint256 public constant MAX_CAP_FOR_FOUNDERS = 100000000 * (10 ** uint256(decimals)); // 100 million
-
-    // Maximum CAP for treasury, 500 million
-    uint256 public constant MAX_CAP_FOR_TREASURY = 500000000 * (10 ** uint256(decimals)); // 500 million
-
-    // Maximum CAP for contigency, 100 million
-    uint256 public constant MAX_CAP_FOR_CONTIGENCY = 100000000 * (10 ** uint256(decimals)); // 100 million
-
-    // Total token Sales 300 million, which will be sold in 4 lots, as like below
-    // Maximum CAP for each lot sales 
-    uint256 constant MAX_CAP_FOR_LOT1 =  30000000 * (10 ** uint256(decimals)); // 30 million
-    uint256 constant MAX_CAP_FOR_LOT2 =  60000000 * (10 ** uint256(decimals)); // 60 million
-    uint256 constant MAX_CAP_FOR_LOT3 =  90000000 * (10 ** uint256(decimals)); // 90 million
-    uint256 constant MAX_CAP_FOR_LOT4 = 120000000 * (10 ** uint256(decimals)); // 120 million
-
-    uint256 constant RATE_FOR_LOT1 = 6;  // USD $0.06 Cents
-    uint256 constant RATE_FOR_LOT2 = 7;  // USD $0.07 Cents
-    uint256 constant RATE_FOR_LOT3 = 8;  // USD $0.08 Cents
-    uint256 constant RATE_FOR_LOT4 = 9;  // USD $0.09 Cents
-
-    // Total Pool Bonus 30 million
-    uint256 constant POOL_BONUS_LOT1 =  3000000 * (10 ** uint256(decimals)); // 3 million
-    uint256 constant POOL_BONUS_LOT2 =  6000000 * (10 ** uint256(decimals)); // 6 million
-    uint256 constant POOL_BONUS_LOT3 =  9000000 * (10 ** uint256(decimals)); // 9 million
-    uint256 constant POOL_BONUS_LOT4 = 12000000 * (10 ** uint256(decimals)); // 12 million
-
-    // Constants for lot sales related
-    uint8 constant MAX_SALE_LOTS = 4;
-    uint8 constant SALE_LOT1 = 0;
-    uint8 constant SALE_LOT2 = 1;
-    uint8 constant SALE_LOT3 = 2;
-    uint8 constant SALE_LOT4 = 3;
-
-    uint256 constant POOL_BONUS_ELIGIBLE = 50000 * (10 ** uint256(decimals)); // 50 thousand
-
-    // Max.Cap for Campaigns, which are all taken from Treasury
-    uint256 constant MAX_CAP_AIRDROP_PROGRAM = 25000000 * (10 ** uint256(decimals)); // 25 million
-    uint256 constant MAX_CAP_BOUNTY_PROGRAM =  15000000 * (10 ** uint256(decimals)); // 15 million
-    uint256 constant MAX_CAP_REFERRAL_PROGRAM =  15000000 * (10 ** uint256(decimals)); // 15 million
-    uint256 constant MAX_CAP_COUPON_PROGRAM =  15000000 * (10 ** uint256(decimals)); // 15 million
-        
-    // There are three stages
-    enum Stages {
-        Setup,
-        Started,
-        Ended
-    }
 
     // Current Stage for the Sale
     Stages public stage;
@@ -144,21 +83,10 @@ contract CouponTokenSale is Pausable {
     /*
      * Event for sale start logging
      *
-     * @param startTime: Start date of sale
-     *
      */
-    event SaleStarted(uint256 startTime);
-
-    /*
-     * Event for sale end logging
-     *
-     * @param endTime: End date of sale
-     *
-     */
-    event SaleEnded(uint256 endTime);
+    event EventCrowdSale(string msg);
 
     event SetEth2Cents(uint rate);
-
 
 
     /*
@@ -336,7 +264,7 @@ contract CouponTokenSale is Pausable {
         startSalesFlag = true;
 
         // Fire the event
-        emit SaleStarted(now);
+        emit EventCrowdSale("Sales Started");
     }
 
      /*
@@ -344,7 +272,9 @@ contract CouponTokenSale is Pausable {
      */
     function endSale() 
         external
-        onlyOwner {
+        onlyOwner 
+        atStage(Stages.Started)
+        {
 
         // Flag to prevent the second call of this function
         require(endSalesFlag == false);
@@ -367,10 +297,10 @@ contract CouponTokenSale is Pausable {
         if(stage == Stages.Started) {
             couponToken.setSalesEndTime(now);
             stage = Stages.Ended;
-            emit SaleEnded(now);
         }
 
         endSalesFlag = true;
+        emit EventCrowdSale("Sales Ended");
     }
 
 
@@ -483,7 +413,7 @@ contract CouponTokenSale is Pausable {
                 // All sale lots completed, so end the sale
                 couponToken.setSalesEndTime(now);
                 stage = Stages.Ended;
-                emit SaleEnded(now);
+                emit EventCrowdSale("Sales Ended");
             } 
         }
 
@@ -498,7 +428,6 @@ contract CouponTokenSale is Pausable {
                 uint256 bonusReferral = purchaseTokens * 4 / 100;
                 couponToken.mint(referrals[purchaser], bonusReferral);
                 couponToken.mint(purchaser, (purchaseTokens * 1 / 100));
-                couponToken.setUserwhoGotBonus(referrals[purchaser], bonusReferral);
             }
 
             // Decrease the total
@@ -507,7 +436,7 @@ contract CouponTokenSale is Pausable {
 
         // Update buyer to CouponToken contract to calculate vesting period(only for Sale-lot1 to Sale-lot3)
         if(currLot != SALE_LOT4)
-            couponToken.setUserwhoPurchasedinLot1to3(purchaser, purchaseTokens);
+            couponToken.setSalesUser(purchaser);
     }
 
 
@@ -585,7 +514,6 @@ contract CouponTokenSale is Pausable {
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
-            couponToken.setUserwhoGotBonus(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);

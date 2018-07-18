@@ -1,5 +1,4 @@
-
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.21;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
@@ -9,10 +8,6 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 //contract CouponToken is MintableToken {
 contract CouponToken is StandardToken, Ownable {
     using SafeMath for uint256;
-
-    string public constant name = "Coupon Chain Token"; 
-    string public constant symbol = "CCT";
-    uint8 public constant decimals = 18;
 
     // Start time of the Sale-lot 4
     uint256 public startTimeOfSaleLot4;
@@ -29,16 +24,12 @@ contract CouponToken is StandardToken, Ownable {
     // Address of CouponTokenCampaign contract
     address public couponTokenCampaignAddr;
 
-    // List for Founders
-    mapping(address => uint256) founders;
+    // List for Vesting Batch 1-Founders 2-Sales & Bouns Users
+    mapping(uint8 => uint256) vestingbatch;
 
-    // List of Purchaser who participated in Lot1 or Lot2 or Lot3
-    mapping(address => uint256) userInLot1to3;
+    // List of User for Vesting Period 
+    mapping(address => uint8) vestingusers;
 
-    // List of User who got bonus tokens
-    mapping(address => uint256) userBonus;
-
-    
     /*
      *
      * E v e n t s
@@ -52,13 +43,6 @@ contract CouponToken is StandardToken, Ownable {
      * M o d i f i e r s
      *
      */
-    /*
-     * Check if token sale address is not set
-     */
-    modifier onlyWhenTokenSaleAddrNotSet() {
-        require(couponTokenSaleAddr == address(0x0));
-        _;
-    }
 
     modifier canMint() {
         require(owner == msg.sender || couponTokenSaleAddr == msg.sender);
@@ -70,13 +54,8 @@ contract CouponToken is StandardToken, Ownable {
         _;
     }
 
-    modifier onlyIfFounderVestingPeriodComplete(address sender) {
-        require(IsFounderVestingPeriodOver(sender) == true);
-        _;
-    }
-
-    modifier onlyIfUserVestingPeriodComplete(address sender) {
-        require(IsUserVestingPeriodOver(sender) == true);
+    modifier onlyIfValidTransfer(address sender) {
+        require(isTransferAllowed(sender) == true);
         _;
     }
 
@@ -126,8 +105,7 @@ contract CouponToken is StandardToken, Ownable {
      */
     function transfer(address to, uint256 value)
         public
-        onlyIfFounderVestingPeriodComplete(msg.sender)
-        onlyIfUserVestingPeriodComplete(msg.sender)
+        onlyIfValidTransfer(msg.sender)
         returns (bool) {
         return super.transfer(to, value);
     }
@@ -141,8 +119,7 @@ contract CouponToken is StandardToken, Ownable {
      */
     function transferFrom(address from, address to, uint256 value)
         public
-        onlyIfFounderVestingPeriodComplete(from)
-        onlyIfUserVestingPeriodComplete(from)
+        onlyIfValidTransfer(from)
         returns (bool){
 
         return super.transferFrom(from, to, value);
@@ -154,39 +131,37 @@ contract CouponToken is StandardToken, Ownable {
         address _couponTokenCampaignAddr)
         external
         onlyOwner
-        onlyWhenTokenSaleAddrNotSet  {
-
+    {
         couponTokenSaleAddr = _couponTokenSaleAddr;
         couponTokenBountyAddr = _couponTokenBountyAddr;
         couponTokenCampaignAddr = _couponTokenCampaignAddr;
     }
 
-    function addFounders(address[] Users, uint256[] Tokens) 
+    function addFounders(address[] _users, uint256[] _tokens) 
         external 
         onlyCallFromCouponTokenSale {
          // Allocation for founders 
-        for(uint i = 0; i < Users.length; i++) { 
-            // Assign tokens
-            founders[Users[i]] = Tokens[i];
+        for(uint i = 0; i < _users.length; i++) { 
+            // Assign under vesting user founder batch
+             vestingusers[_users[i]] = 1;
 
             // Mint the required tokens
-            mint(Users[i], Tokens[i]);
+            mint(_users[i], _tokens[i]);
 
             // Emit the event
-            emit FounderAdded(Users[i], Tokens[i]);
+            emit FounderAdded(_users[i], _tokens[i]);
         }
     }
 
     function IsFounder(address user)
         external view
         returns(bool) {
-        return (founders[user] > 0);
+        return (vestingusers[user] == 1);
     }
 
     function setSalesEndTime(uint256 _endSaleTime) 
         external
         onlyCallFromCouponTokenSale  {
-
         endSaleTime = _endSaleTime;
     }
 
@@ -196,43 +171,24 @@ contract CouponToken is StandardToken, Ownable {
         startTimeOfSaleLot4 = _startTime;
     }
 
-    function setUserwhoPurchasedinLot1to3(address user, uint256 tokens)
-        external
-        onlyCallFromCouponTokenSale {
 
-        userInLot1to3[user] = userInLot1to3[user].add(tokens);
+    function setSalesUser(address _user)
+        public
+        onlyOwner {
+        // Add vesting user under sales purchase
+        vestingusers[_user] = 1;
     }
 
-    function setUserwhoGotBonus(address user, uint256 tokens)
-        external
-        onlyCallFromTokenSaleOrBountyOrCampaign {
-        userBonus[user] = userBonus[user].add(tokens);
-    }
-
-
-    function IsFounderVestingPeriodOver(address user)
+    function isTransferAllowed(address _user)
         internal view
         returns (bool) {
-
         bool retVal = true;
-        if(founders[user] > 0 && now < (endSaleTime + 730 days)) // 2 years
-            retVal = false;            
-
-        return retVal;
-    }
-
-    function IsUserVestingPeriodOver(address user)
-        internal view
-        returns (bool) {
-
-        bool retVal = true;
-        // See the user participated in lots 1,2 3 or Bouns(Bounty, Campaign, Referral) given, if so
-        // he can't do the transfer till the vesting period over
-        if((now >= (startTimeOfSaleLot4 + 90 days)) &&          // 3 months
-            (userInLot1to3[user] > 0 || userBonus[user] > 0) ) {
-            retVal = false;
+        if(vestingusers[_user] > 0 ){
+            if(vestingusers[_user] == 1 && (now < (endSaleTime + 730 days))) // 2 years
+                retVal = false;
+            if(vestingusers[_user] == 2 && (now >= (startTimeOfSaleLot4 + 90 days)))
+                retVal = false;
         }
-        
         return retVal;
     }
 }
