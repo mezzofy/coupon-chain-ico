@@ -30,9 +30,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     address private bountyAddr;
     address private couponCampaignAddr;
 
-    // Amount of raised in Wei (1 ether)
-    uint256 public totalWeiRaised;
-
     // TreasuryTokens
     uint256 public remainingTreasuryTokens;
 
@@ -85,7 +82,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      *
      */
     event FounderAdded(address indexed founder, uint256 tokens);
-    
+
     event EventCrowdSale(string msg);
 
     event SetEth2Cents(uint rate);
