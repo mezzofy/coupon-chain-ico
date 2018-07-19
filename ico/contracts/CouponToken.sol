@@ -140,12 +140,6 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
         couponTokenCampaignAddr = _couponTokenCampaignAddr;
     }
 
-   
-    function IsFounder(address user)
-        external view
-        returns(bool) {
-        return (vestingUsers[user] == USER_FOUNDER);
-    }
 
     function setSalesEndTime(uint256 _endSaleTime) 
         external

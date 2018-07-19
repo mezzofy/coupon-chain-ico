@@ -22,13 +22,16 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     // Address of Contigency
     address private contigencyAddr;
-
-    // Coupon Token contract address
-    CouponToken public couponToken;
-
+    
     // addresses to store bounty and couponCampaign
     address private bountyAddr;
     address private couponCampaignAddr;
+
+    // Founders list
+    mapping(address => uint256) founders;
+
+    // Coupon Token contract address
+    CouponToken public couponToken;
 
     // TreasuryTokens
     uint256 public remainingTreasuryTokens;
@@ -41,7 +44,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     // Current Stage for the Sale
     Stages public stage;
-
     
     // The current lot of the sale(1, 2, 3, 4)
     uint8 public currLot;
@@ -234,6 +236,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             
             // Mint the required tokens
             couponToken.mint(Users[i], Tokens[i]);
+
+            // Add it to Founder mapping
+            founders[Users[i]] = Tokens[i];
 
             // Set this user as Founder for Vesting period checking
             couponToken.setFounderUser(Users[i]);
@@ -609,12 +614,12 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         returns (bool) {
 
         return (
-            user != address(0) &&
-            user != owner &&
-            user != fundAddr &&
-            user != treasuryAddr &&
-            user != contigencyAddr &&
-            !couponToken.IsFounder(user)
+            user != address(0) &&       // Should not be 0
+            user != owner &&            // Should not be owner
+            user != fundAddr &&         // Should not be Fund address
+            user != treasuryAddr &&     // Should not be Treasury address
+            user != contigencyAddr &&   // Should not be Contigency address
+            founders[user] == 0         // Should not be founder
         );
     }
 
