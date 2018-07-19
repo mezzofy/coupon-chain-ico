@@ -188,7 +188,7 @@ contract CouponToken is StandardToken, Ownable, CouponTokenConfig {
         if(vestingUsers[_user] != USER_NONE ){
             if(vestingUsers[_user] == USER_FOUNDER && (now < (endSaleTime + 730 days))) // 2 years
                 retVal = false;
-            if((vestingUsers[_user] == USER_BUYER || vestingUsers[_user] == USER_BONUS) && (now >= (startTimeOfSaleLot4 + 90 days)))
+            if((vestingUsers[_user] == USER_BUYER || vestingUsers[_user] == USER_BONUS) && (now < (startTimeOfSaleLot4 + 90 days)))
                 retVal = false;
         }
         return retVal;

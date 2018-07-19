@@ -384,6 +384,10 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Mint the required tokens
         couponToken.mint(purchaser, purchaseTokens);
 
+        // Update buyer to CouponToken contract to calculate vesting period(only for Sale-lot1 to Sale-lot3)
+        if(currLot != SALE_LOT4)
+            couponToken.setSalesUser(purchaser);
+
         // Transfer from Treasury if needed
         if(needToTakeFromTreasury > 0) {
             remainingTreasuryTokens = remainingTreasuryTokens.sub(needToTakeFromTreasury);
@@ -448,10 +452,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             // Decrease the total
             remainingReferralTokens = remainingReferralTokens.sub(referralTokensNeeded);
         }
-
-        // Update buyer to CouponToken contract to calculate vesting period(only for Sale-lot1 to Sale-lot3)
-        if(currLot != SALE_LOT4)
-            couponToken.setSalesUser(purchaser);
     }
 
 
