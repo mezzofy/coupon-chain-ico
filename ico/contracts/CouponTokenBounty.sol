@@ -1,4 +1,4 @@
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.21;
 
 import "./CouponToken.sol";
 import "./CouponTokenSale.sol";
@@ -132,11 +132,7 @@ contract CouponTokenBounty {
         onlyInSalesState {
 
         // user should not be empty, founder, owner, treasury, contigency address
-        require(
-            user != address(0x0) &&
-            user != owner &&
-            !couponTokenSale.IsPrivateAddress(user) &&
-            !couponToken.IsFounder(user));
+        require(couponTokenSale.IsValidAddress(user));
 
         // Condition
         require(couponTokenSale.remainingBountyTokens() >= bountyProgram[bountyId].tokensForEvent);
@@ -153,7 +149,7 @@ contract CouponTokenBounty {
 
          // Mint the required tokens
         couponToken.mint(user, bountyTokens);
-        
+
         // Set this user as bonus alloted
         couponToken.setBonusUser(user);
 

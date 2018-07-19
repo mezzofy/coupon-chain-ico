@@ -77,10 +77,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      * Events
      */
 
-    /*
-     * Event for sale start logging
-     *
-     */
     event FounderAdded(address indexed founder, uint256 tokens);
 
     event EventCrowdSale(string msg);
@@ -97,6 +93,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      */
     event TokenPurchase(address indexed purchaser, uint256 value, uint256 amount);
 
+    event BuyFiat(address indexed toUser, uint256 inCents, uint256 purchaseTokens);
+
 
     /*
      * Modifiers
@@ -106,8 +104,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         _;
     }
 
-    modifier onlyValidPurchase() {
-        require(msg.sender != address(0));
+    modifier onlyValidAddress(address user) {
+        // Should be valid address
+        require(IsValidAddress(user));
         _;
     }
 
@@ -178,9 +177,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     }
 
     /*
-     * SetupContract with addresses
+     * SetupSale with addresses
      */
-    function setupContract(address _fundAddr, address _treasuryAddr, address _contigencyAddr) 
+    function setupSale(address _fundAddr, address _treasuryAddr, address _contigencyAddr) 
         external
         onlyOwner
         atStage(Stages.Ended) {
@@ -319,9 +318,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         public 
         payable
         whenNotPaused
-        atStage(Stages.Started)
-        onlyValidPurchase()
-        returns (bool) {
+        onlyValidAddress(msg.sender)
+        atStage(Stages.Started)  {
 
         address purchaser = msg.sender;
         uint256 contributionInWei = msg.value;
@@ -335,17 +333,20 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
         // Transfer contributions to fund address
         fundAddr.transfer(contributionInWei);
-        emit TokenPurchase(msg.sender, contributionInWei, purchaseTokens);
 
-        return true;
+        // Emit the status
+        emit TokenPurchase(purchaser, contributionInWei, purchaseTokens);
     }
 
+    /*
+     * Function: buyFiat()
+     */
     function buyFiat(address toUser, uint256 inCents) 
         public
         onlyOwner
         whenNotPaused
-        atStage(Stages.Started)
-        returns (bool) {
+        onlyValidAddress(toUser)
+        atStage(Stages.Started) {
 
         // Find no.of tokens to be purchased
         uint256 purchaseTokens = inCents.mul(10 ** uint256(decimals)).div(lotsInfo[currLot].rateInCents);
@@ -353,8 +354,14 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Call purchase()    
         purchase(toUser, purchaseTokens);
 
-        return true;
+        // Emit the notification
+        emit BuyFiat(toUser, inCents, purchaseTokens);
+
     }
+
+    /*
+     * Function: purchase()
+     */
 
     function purchase(address purchaser, uint256 purchaseTokens)
         internal {
@@ -421,7 +428,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                 // All sale lots completed, so end the sale
                 couponToken.setSalesEndTime(now);
                 stage = Stages.Ended;
-                emit EventCrowdSale("Sales Ended");
+                //emit EventCrowdSale("Sales Ended");
             } 
         }
 
@@ -511,14 +518,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
         for(uint16 i = 0; i < users.length; i++) {
 
-            // user should not be empty, founder, owner, treasury, contigency address
-            require(
-                users[i] != address(0x0) &&
-                users[i] != owner &&
-                users[i] != fundAddr && 
-                users[i] != treasuryAddr &&
-                users[i] != contigencyAddr &&
-                !couponToken.IsFounder(users[i]) );
+            // Should be valid address
+            require(IsValidAddress(users[i]));
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
@@ -585,26 +586,10 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     function addReferrer(address user, address referredBy)
         external
         onlyOwner
+        onlyValidAddress(user)
+        onlyValidAddress(referredBy)
         atStage(Stages.Started) {
 
-        // user should not be empty, founder, owner, treasury, contigency address
-        require(
-            user != address(0x0) &&
-            user != owner &&
-            user != fundAddr && 
-            user != treasuryAddr &&
-            user != contigencyAddr &&
-            !couponToken.IsFounder(user));
-
-        // referredBy should not be empty, founder, owner, treasury, contigency address
-        require(
-            referredBy != address(0x0) &&
-            referredBy != owner &&
-            referredBy != fundAddr && 
-            referredBy != treasuryAddr &&
-            referredBy != contigencyAddr &&
-            !couponToken.IsFounder(referredBy));
-        
         referrals[user] = referredBy;
     }
 
@@ -615,14 +600,17 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     //
     //
     //*************************************************************************/
-    function IsPrivateAddress(address user) 
-        external view
+    function IsValidAddress(address user) 
+        public view
         returns (bool) {
 
         return (
-            user == fundAddr ||
-            user == treasuryAddr ||
-            user == contigencyAddr
+            user != address(0) &&
+            user != owner &&
+            user != fundAddr &&
+            user != treasuryAddr &&
+            user != contigencyAddr &&
+            !couponToken.IsFounder(user)
         );
     }
 

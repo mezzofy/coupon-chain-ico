@@ -1,4 +1,4 @@
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.21;
 
 
 import "./CouponToken.sol";
@@ -179,11 +179,7 @@ contract CouponTokenCampaign {
         onlyInSalesState {
 
         // user should not be empty, founder, owner, treasury, contigency address
-        require(
-            user != address(0x0) &&
-            user != owner &&
-            !couponTokenSale.IsPrivateAddress(user) &&
-            !couponToken.IsFounder(user));
+        require(couponTokenSale.IsValidAddress(user));
 
         // Coupon should be added already and not redeemed
         require(couponInfo[couponId].added == true && couponInfo[couponId].redeemed == false);
