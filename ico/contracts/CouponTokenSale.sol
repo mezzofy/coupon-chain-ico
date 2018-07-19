@@ -517,9 +517,13 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         require(remainingAirDropTokens >= totalTokens);
 
         for(uint16 i = 0; i < users.length; i++) {
-
             // Should be valid address
             require(IsValidAddress(users[i]));
+        }
+
+
+
+        for(i = 0; i < users.length; i++) {
 
              // Mint the required tokens
             couponToken.mint(users[i], tokens);
