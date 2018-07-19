@@ -1,33 +1,29 @@
 const CCTCoinSale = artifacts.require("CouponTokenSale.sol");
 const CCTCoin = artifacts.require("CouponToken.sol");
 
- 
-contract("Coupon Token Sale addFounders Test Cases", (accounts) => {
+ contract("Coupon Token Sale addFounders Test Cases", (accounts) => {
     const owner = accounts[0];
-    const saleAddr = accounts[1];
-    const bountyAddr = accounts[2];
-    const compaignAddr = accounts[3];
 
-    const fundAddr = accounts[4];
-    const contigencyAddr = accounts[5];
-    const treassuryAddr = accounts[6];
+    const fundAddr = accounts[1];
+    const contigencyAddr = accounts[2];
+    const treassuryAddr = accounts[3];
     
     let token = null;
     let sale = null;
  
     beforeEach("setup contract for each test", async () => {
       token = await CCTCoin.new({from:owner});
-      await token.setContractAddresses(saleAddr,bountyAddr,compaignAddr);
       sale = await CCTCoinSale.new(token.address, {from:owner});
+      await token.setContractAddresses(sale.address,0,0);
+      await sale.setupSale(fundAddr,treassuryAddr,contigencyAddr);
     });
 
 
     it("addFounders should not be Owner/Fund/Treasury/Contigency address ",async()=>{
-        var founders = [accounts[2],accounts[3],accounts[1]];
+        var founders = [accounts[2],accounts[3],accounts[4]];
         var tokens= [1001,10001,100001];   
     
         try {
-          await sale.setupContract(fundAddr,treassuryAddr,contigencyAddr);
           await sale.addFounders(founders,tokens);
           throw(1);
         }catch(err) {
@@ -96,7 +92,7 @@ contract("Coupon Token Sale addFounders Test Cases", (accounts) => {
         }   
     }); 
   
-/*      it("addFounders validation",async()=>{
+      it("addFounders validation",async()=>{
       var founders = [accounts[5],accounts[6],accounts[7]];
       var tokens= [1001,10001,100001];   
   
@@ -110,28 +106,27 @@ contract("Coupon Token Sale addFounders Test Cases", (accounts) => {
        if(tokenbalance != tokens[0])
           assert(false,'addFounder successfully done. But tokens not available into users.')    
     }); 
- */
+ 
   
 });
 
 contract("Coupon Coin Token airDrop Test",(accounts)=>{
 
     const owner = accounts[0];
-    const admin = accounts[1];
-    const fund = accounts[2];
-    const user = accounts[3];
-  
+
     let token = null;
     let sale = null;
-    let sale1=null;
   
     beforeEach("setup contract for each test", async () => {
       token = await CCTCoin.new({from: owner });
       sale = await CCTCoinSale.new( token.address, { from: owner });
-
-      await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
+      await token.setContractAddresses(sale.address,0,0);
+      await sale.setupSale(accounts[2],accounts[3],accounts[4]); 
       await sale.setEth2Cents(45000);
-      await sale.startSale();      
+      await sale.startSale();    
+      //var startSaleFlag = await sale.startSalesFlag();
+     // console.log('StartSalesFlag:',startSaleFlag);
+
 
     });
   
@@ -177,7 +172,7 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
         }   
     });   
   
-/*     it('airDrop validation',async()=>{
+     it('airDrop validation',async()=>{
       var airDroppers = [accounts[5],accounts[6],accounts[7]];
       var tokens= 1000*(10**18); 
     
@@ -186,12 +181,12 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
         }catch(err) {
           assert(false, 'airDrop Failed.');
       } 
-      //var x = await sale.remainingAirDropTokens();
-      //console.log('Airdrop remaining',x.toNumber()/(10**18) );
-      var tokenbalance=await token.balanceOf(accounts[5]);
-      if(tokenbalance != tokens)
-        assert(false,'airDrop successfully done. But tokens not available into users.')
-    }) */;
+      var x = await sale.remainingAirDropTokens();
+      console.log('Airdrop remaining',x.toNumber()/(10**18) );
+      //var tokenbalance=await token.balanceOf(accounts[5]);
+      //if(tokenbalance != tokens)
+      //  assert(false,'airDrop successfully done. But tokens not available into users.')
+    });
   });
 
   contract("Coupon Coin Token buyFiat & calculatePoolBonus Test",(accounts)=>{
@@ -201,19 +196,18 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
     const bountyAddr = accounts[2];
     const compaignAddr = accounts[3];    
 
-  
     let token = null;
     let sale = null;
   
     beforeEach("setup contract for each test", async () => {
       token = await CCTCoin.new({from: owner });
       sale = await CCTCoinSale.new( token.address, { from: owner });
-      await token.setContractAddresses(saleAddr,bountyAddr,compaignAddr);
-      await sale.setupContract(accounts[2],accounts[3],accounts[4]); 
+      await token.setContractAddresses(sale.address,0,0);
+      await sale.setupSale(accounts[2],accounts[3],accounts[4]); 
       await sale.setEth2Cents(45000);
       await sale.startSale();
-      var startSaleFlag = await sale.startSalesFlag();
-      console.log('StartSalesFlag:',startSaleFlag);
+      //var startSaleFlag = await sale.startSalesFlag();
+      //console.log('StartSalesFlag:',startSaleFlag);
 
     });
   
@@ -287,4 +281,87 @@ contract("Coupon Coin Token airDrop Test",(accounts)=>{
           assert(false,'buyFiat error.calculatePoolBonus not handled properly.')
       //console.log('User5 Tokens After  Bonus:',tokenbalance1.toNumber()/(10**18))
     });
+  });
+
+  contract("Coupon Coin Token transfer Test",(accounts)=>{
+
+    const owner = accounts[0];
+    const saleAddr = accounts[1];
+    const bountyAddr = accounts[2];
+    const compaignAddr = accounts[3];     
+    
+    let token = null;
+    let sale = null;
+  
+    var buyer1 = accounts[6];
+    var buyer2 = accounts[7];
+    var buyer3 = accounts[8];
+    var buyer4 = accounts[9];
+  
+    var cents1= 6 * 30000000; // 30 million
+    var cents2= 7 * 60000000; // 60 million
+    var cents3= 8 * 90000000; // 90 million
+    var cents4= 9 *120000000; // 120 million  
+  
+    beforeEach("setup contract for each test", async () => {
+      token = await CCTCoin.new({from: owner });
+      sale = await CCTCoinSale.new( token.address, { from: owner });
+      await token.setContractAddresses(sale.address,0,0);
+      await sale.setupSale(accounts[2],accounts[3],accounts[4]); 
+      await sale.setEth2Cents(45000);
+      await sale.startSale();
+      //var startSaleFlag = await sale.startSalesFlag();
+      //console.log('StartSalesFlag:',startSaleFlag);
+    });
+  
+    it('LOT4 users should allow to transfer without any vesting period',async()=>{
+      try {
+        await sale.buyFiat(buyer1,cents1);
+        await sale.buyFiat(buyer2,cents2);
+        await sale.buyFiat(buyer3,cents3);
+        await sale.buyFiat(buyer4,cents4);
+        await sale.endSale();
+        await token.transfer(buyer2,1000 *(10**18),{from: buyer4 });
+      }catch(err) {
+        assert(false, 'users transfer Failed.');
+      }   
+    });
+  
+    it("fouders should not allow to transfer until vesting period over.",async()=>{
+      var founders = [accounts[5],accounts[6],accounts[7]];
+      var tokens= [1001,10001,100001];   
+    
+      try{
+        await sale.addFounders(founders,tokens);
+        var tokenbalance=await token.balanceOf(accounts[5]);
+        //console.log('Tokens for account no5 :' ,tokenbalance.toNumber());
+        if(tokenbalance != tokens[0])
+          assert(false,'addFounder successfully done. But tokens not available into users.')    
+        await token.transfer(buyer2,1000 *(10**18),{from:accounts[5]});
+        throw(1);
+        }catch(err)
+        {
+          if(err == 1)
+            assert(false, 'founder transfer success.vesting period validation not handled.');
+        }
+    });    
+  
+    it('LOT1/LOT2/LOT3 users should not allow to transfer until vesting period over.',async()=>{
+       try {
+         await sale.buyFiat(buyer1,cents1);
+        await sale.buyFiat(buyer2,cents2);
+        await sale.buyFiat(buyer3,cents3);
+        await sale.buyFiat(buyer4,cents4);
+        await sale.endSale();
+        var tknBalanceOf4= await token.balanceOf(buyer2);
+        console.log('Buyer 2 Balance Before:',tknBalanceOf4.toNumber()/(10**18));
+        await token.transfer(buyer2,1000 *(10**18),{from:buyer1});
+        tknBalanceOf4= await token.balanceOf(buyer2);
+        console.log('Buyer 2 Balance After:',tknBalanceOf4.toNumber()/(10**18));
+        throw(1);
+      }catch(err) {
+        if(err == 1)
+            assert(false, 'users transfer success.vesting period validation not handled.');
+      }   
+    });  
   });

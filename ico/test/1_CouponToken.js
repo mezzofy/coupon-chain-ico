@@ -6,8 +6,7 @@ contract("Coupon Token Test Cases", (accounts) => {
     const saleAddr = accounts[1];
     const bountyAddr = accounts[2];
     const compaignAddr = accounts[3];
-    
-  
+      
     let token = null;
  
     beforeEach("setup contract for each test", async () => {
@@ -26,7 +25,7 @@ contract("Coupon Token Test Cases", (accounts) => {
     });
  
   
-    it("CouponToken mint should mine the tokens to specified user.",function (done){
+/*     it("CouponToken mint should mine the tokens to specified user.",function (done){
       try {
         let user1 = accounts[9];
         let amtTokens=100*(10**18);
@@ -41,9 +40,9 @@ contract("Coupon Token Test Cases", (accounts) => {
             return done(err);
           }
     
-          /* toAddress = result.args._to;
-          amtToken = result.args._amount;
-          console.log('User emitted tokens:',amtToken); */
+          // toAddress = result.args._to;
+          //amtToken = result.args._amount;
+          //console.log('User emitted tokens:',amtToken); 
           tknBalanceOfUser= await token.balanceOf(user1);
           //console.log('User 1 Balance After emit:',tknBalanceOfUser.toNumber()/(10**18));
           done();
@@ -51,7 +50,7 @@ contract("Coupon Token Test Cases", (accounts) => {
        }catch(err) {
           assert(false, 'mint Failed');
       }   
-    });
+    }); */
 
  
 /*     it("CouponToken transfer should transfer the tokens to the destinated user.",async () => {
