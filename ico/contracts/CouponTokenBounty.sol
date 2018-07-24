@@ -12,13 +12,13 @@ contract CouponTokenBounty {
     CouponTokenSale couponTokenSale;
 
    
-    
     struct UserInfoForCampaign {
         bool fullfillmentDone;
         uint256 bonusTokensAlotted;
     }
 
     struct EventData {
+        string eventName;
         uint256 tokensForEvent;
         bool activated;
         bool killed;
@@ -27,7 +27,7 @@ contract CouponTokenBounty {
 
     // Event Data for Bounty Program
     uint32 bountyIndex;
-    mapping(uint32 => EventData) bountyProgram;
+    mapping(uint32 => EventData) public bountyProgram;
 
 
     /**
@@ -46,7 +46,7 @@ contract CouponTokenBounty {
     /*
      * Events
      */
-    event BountyAction(bytes32 actionString, uint32 newBountyId);
+    event BountyAction(string actionString, uint32 bountyId);
 
     /*
      * Constructor
@@ -62,7 +62,7 @@ contract CouponTokenBounty {
      * Function: createBounty()
      *
     */
-    function createBounty(uint256 noOfTokens)
+    function createBounty(uint256 noOfTokens, string bountyName)
         external
         onlyOwner
         onlyInSalesState {
@@ -75,8 +75,9 @@ contract CouponTokenBounty {
         bountyIndex++;
 
         bountyProgram[newEventId].tokensForEvent = noOfTokens;
+        bountyProgram[newEventId].eventName = bountyName;
 
-        emit BountyAction("CREATED", newEventId);
+        emit BountyAction("Bounty Created", newEventId);
     }
 
     /*
@@ -95,7 +96,7 @@ contract CouponTokenBounty {
 
         bountyProgram[bountyId].killed = true;
 
-        emit BountyAction("KILLED", bountyId);
+        emit BountyAction("Bounty Killed", bountyId);
     }
 
     /*
@@ -115,7 +116,7 @@ contract CouponTokenBounty {
 
         bountyProgram[bountyId].activated = true;
 
-        emit BountyAction("ACTIVATED", bountyId);
+        emit BountyAction("Bounty Activated", bountyId);
     }
 
     
@@ -158,6 +159,6 @@ contract CouponTokenBounty {
 
         bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
 
-        emit BountyAction("FULLFILLED", bountyId);
+        emit BountyAction("Bounty Fullfilled", bountyId);
     }
 }

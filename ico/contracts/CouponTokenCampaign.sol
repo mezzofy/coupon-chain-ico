@@ -11,14 +11,14 @@ contract CouponTokenCampaign {
     CouponToken couponToken;
     CouponTokenSale couponTokenSale;
 
-    bool public inSaleState;
-
+   
     struct UserInfoForCampaign {
         bool fullfillmentDone;
         uint256 bonusTokensAlotted;
     }
 
     struct EventData {
+        string eventName;
         uint256 tokensForEvent;
         bool activated;
         bool killed;
@@ -35,10 +35,10 @@ contract CouponTokenCampaign {
 
     // Event-data for Coupon Bonus Program
     uint32 couponCampaignIndex;
-    mapping(uint32 => EventData) couponCampaignProgram;
+    mapping(uint32 => EventData) public couponCampaignProgram;
 
     // Coupons mapping
-    mapping(bytes32 => CouponCampaignInfo) couponInfo;
+    mapping(bytes32 => CouponCampaignInfo) public couponInfo;
 
 
     /**
@@ -57,7 +57,7 @@ contract CouponTokenCampaign {
     /*
      * Events
      */
-    event CouponCampaignAction(bytes32 actionString, uint32 newCouponId);
+    event CouponCampaignAction(string actionString, uint32 campaignId);
 
 
     /*
@@ -75,7 +75,7 @@ contract CouponTokenCampaign {
      * Function: createCoupon()
      *
      */
-    function createCouponCampaign(uint256 noOfTokens)
+    function createCouponCampaign(uint256 noOfTokens, string campaignName)
         external
         onlyOwner
         onlyInSalesState 
@@ -89,8 +89,9 @@ contract CouponTokenCampaign {
         couponCampaignIndex++;
 
         couponCampaignProgram[newCouponId].tokensForEvent = noOfTokens;
+        couponCampaignProgram[newCouponId].eventName = campaignName;
 
-        emit CouponCampaignAction("CREATED", newCouponId);
+        emit CouponCampaignAction("Campaign Created", newCouponId);
     }
     
      /*
@@ -110,7 +111,7 @@ contract CouponTokenCampaign {
 
         couponCampaignProgram[campaignId].killed = true;
 
-        emit CouponCampaignAction("KILLED", campaignId);
+        emit CouponCampaignAction("Campaign Killed", campaignId);
 
     }
 
@@ -126,10 +127,14 @@ contract CouponTokenCampaign {
 
         require(
             campaignId < couponCampaignIndex && 
-            coupons.length > 0);
+            coupons.length > 0 &&
+            couponCampaignProgram[campaignId].activated == false && 
+            couponCampaignProgram[campaignId].killed == false);
 
+        
         // Check for duplicate coupons
         for(uint32 i = 0; i < coupons.length; i++) {
+            require(coupons[i] != 0x0);
             require(couponInfo[coupons[i]].added == false);
         }
 
@@ -142,7 +147,7 @@ contract CouponTokenCampaign {
         // Set no.of coupons
         couponCampaignProgram[campaignId].noOfCouponsAdded = uint32(coupons.length);
 
-        emit CouponCampaignAction("ADDCOUPON", campaignId);
+        emit CouponCampaignAction("Coupons Added in Campaign", campaignId);
 
     }
 
@@ -163,7 +168,7 @@ contract CouponTokenCampaign {
 
         couponCampaignProgram[campaignId].activated = true;
 
-        emit CouponCampaignAction("ACTIVATED", campaignId);
+        emit CouponCampaignAction("Campaign Activated", campaignId);
     }
 
     
@@ -173,7 +178,7 @@ contract CouponTokenCampaign {
      * Function: redeemCoupon()
      *
     */
-    function redeemCoupon(bytes32 couponId, address user)
+    function redeemCoupon(bytes32 coupon, address user)
         external 
         onlyOwner
         onlyInSalesState {
@@ -182,10 +187,10 @@ contract CouponTokenCampaign {
         require(couponTokenSale.IsValidAddress(user));
 
         // Coupon should be added already and not redeemed
-        require(couponInfo[couponId].added == true && couponInfo[couponId].redeemed == false);
+        require(couponInfo[coupon].added == true && couponInfo[coupon].redeemed == false);
 
         // Sufficient tokens available?
-        uint32 campaignId = couponInfo[couponId].campaignId;
+        uint32 campaignId = couponInfo[coupon].campaignId;
         require(couponTokenSale.remainingBountyTokens() >= couponCampaignProgram[campaignId].tokensForEvent);
 
         require(
@@ -208,11 +213,10 @@ contract CouponTokenCampaign {
         
 
         // Mark this coupon as redeemed
-        couponInfo[couponId].redeemed = true;
+        couponInfo[coupon].redeemed = true;
         
         couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == true;
 
-        emit CouponCampaignAction("REDEEMED", campaignId);
+        emit CouponCampaignAction("Coupon Redeemed in Campaign", campaignId);
     }
-
 }
