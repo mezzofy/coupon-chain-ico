@@ -145,7 +145,8 @@ contract CouponTokenCampaign {
         }
 
         // Set no.of coupons
-        couponCampaignProgram[campaignId].noOfCouponsAdded = uint32(coupons.length);
+        couponCampaignProgram[campaignId].noOfCouponsAdded = 
+            couponCampaignProgram[campaignId].noOfCouponsAdded + uint32(coupons.length);
 
         emit CouponCampaignAction("Coupons Added in Campaign", campaignId);
 
