@@ -316,14 +316,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             if(linfo.totalTokens > linfo.soldTokens)
                 treasuryTokens = treasuryTokens.add(linfo.totalTokens - linfo.soldTokens);
         }
-                
-
-        // Reset all the remaining balances
-        remainingTreasuryTokens = 0;
-        remainingAirDropTokens = 0;
-        remainingBountyTokens = 0;
-        remainingReferralTokens = 0;
-        remainingCouponTokens = 0;
 
         // mint the balance to Treasury wallet
         couponToken.mint(treasuryAddr, treasuryTokens);
