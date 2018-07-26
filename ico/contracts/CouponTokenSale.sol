@@ -291,10 +291,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Flag to prevent the second call of this function
         require(endSalesFlag == false);
 
-         // See the pool bonus are calculated, if not return
-        for(uint8 i = 0; i < MAX_SALE_LOTS; i++) {
-            require(lotsInfo[i].poolBonusCalculated == true);
-        }
+        // Sale is going to end, so force calculate bonus for un-finished sale-lots aswell
+        calcPoolBonus(MAX_SALE_LOTS);
 
 
         // Allocate tokens for contigency
@@ -309,7 +307,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens) -
             (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
 
-        for(i = 0; i<MAX_SALE_LOTS; i++) {
+        for(uint8 i = 0; i<MAX_SALE_LOTS; i++) {
             LotInfos memory linfo = lotsInfo[i];
             // Check all poolBonus tokens are issued, if not it should goto treasury a/c    
             treasuryTokens = treasuryTokens.add(linfo.poolBonus - linfo.bonusTokens);
@@ -491,35 +489,44 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      *
      */
     function calculatePoolBonus() external onlyOwner {
+        // Calculate PoolBounus till the previous Sale lot
+        calcPoolBonus(currLot);
+    }
+
+
+     /*
+     *
+     * Function: calcPoolBonus()
+     *
+     */
+    function calcPoolBonus(uint8 _currLot) private {
 
         // Calculate PoolBonus for all the previous lots of current lot
-        for(uint8 i = 0; i < currLot; i++) {
+        for(uint8 i = 0; i < _currLot; i++) {
             // Continue the loop of Pool bonus calculated already
             if(lotsInfo[i].poolBonusCalculated == true) continue;
 
             // contine the loop if nothing to calculate
-            if(lotsInfo[i].cumulativeBonusTokens == 0) 
-                continue;
+            if(lotsInfo[i].cumulativeBonusTokens > 0) { 
+                // Enumerate and allot bonus
+                for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
 
-            
-            // Enumerate and allot bonus
-            for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
-
-                address addr = lotsInfo[i].buyersList[j];
-                BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[addr];
-                
-                // Bonus eligible?
-                if(buyerInfo.bonusEligible) {
+                    address addr = lotsInfo[i].buyersList[j];
+                    BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[addr];
                     
-                    // Allot bonus tokens                    
-                    buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
-                    
-                    // Add it to LotInfo as well
-                    lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
+                    // Bonus eligible?
+                    if(buyerInfo.bonusEligible) {
+                        
+                        // Allot bonus tokens                    
+                        buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
+                        
+                        // Add it to LotInfo as well
+                        lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
 
-                    // Mint the required tokens
-                    couponToken.mint(addr, buyerInfo.bonusTokensAlotted);
-                }           
+                        // Mint the required tokens
+                        couponToken.mint(addr, buyerInfo.bonusTokensAlotted);
+                    }           
+                }
             }
 
             // Mark as Pool Bonus alloted
