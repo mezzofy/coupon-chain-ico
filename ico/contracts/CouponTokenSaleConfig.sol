@@ -58,6 +58,7 @@ contract CouponTokenSaleConfig {
         
     // There are three stages
     enum Stages {
+        Init,
         Setup,
         Started,
         Ended

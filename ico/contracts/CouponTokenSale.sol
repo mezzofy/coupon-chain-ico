@@ -134,7 +134,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         couponToken = CouponToken(couponTokenAddress);
 
         // Initially set the state as Ended
-        stage = Stages.Ended;
+        stage = Stages.Init;
 
         // Fill Lots Information to structure
         lotsInfo[SALE_LOT1].totalTokens = MAX_CAP_FOR_LOT1;
@@ -184,7 +184,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     function setupSale(address _fundAddr, address _treasuryAddr, address _contigencyAddr) 
         external
         onlyOwner
-        atStage(Stages.Ended) {
+        atStage(Stages.Init) {
 
         require(_fundAddr != address(0));
         require(_treasuryAddr != address(0));
@@ -291,16 +291,41 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Flag to prevent the second call of this function
         require(endSalesFlag == false);
 
+         // See the pool bonus are calculated, if not return
+        for(uint8 i = 0; i < MAX_SALE_LOTS; i++) {
+            require(lotsInfo[i].poolBonusCalculated == true);
+        }
+
+
         // Allocate tokens for contigency
         couponToken.mint(contigencyAddr, MAX_CAP_FOR_CONTIGENCY);
 
-        // Calculate remaing balance for Treasury
+        /* Calculate remaining balance for Treasury
+         *  AirDropTokens, BountyTokens, ReferralTokens and CouponTokens are the subset of Treasury balace
+         */
         uint256 treasuryTokens = remainingTreasuryTokens - 
-            (POOL_BONUS_LOT1 + POOL_BONUS_LOT2 + POOL_BONUS_LOT3 + POOL_BONUS_LOT4) -
             (MAX_CAP_AIRDROP_PROGRAM - remainingAirDropTokens) - 
             (MAX_CAP_BOUNTY_PROGRAM - remainingBountyTokens) -
             (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens) -
             (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
+
+        for(i = 0; i<MAX_SALE_LOTS; i++) {
+            LotInfos memory linfo = lotsInfo[i];
+            // Check all poolBonus tokens are issued, if not it should goto treasury a/c    
+            treasuryTokens = treasuryTokens.add(linfo.poolBonus - linfo.bonusTokens);
+
+            // Unsold tokens should goto treasury a/c
+            if(linfo.totalTokens > linfo.soldTokens)
+                treasuryTokens = treasuryTokens.add(linfo.totalTokens - linfo.soldTokens);
+        }
+                
+
+        // Reset all the remaining balances
+        remainingTreasuryTokens = 0;
+        remainingAirDropTokens = 0;
+        remainingBountyTokens = 0;
+        remainingReferralTokens = 0;
+        remainingCouponTokens = 0;
 
         // mint the balance to Treasury wallet
         couponToken.mint(treasuryAddr, treasuryTokens);
@@ -489,7 +514,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                     // Allot bonus tokens                    
                     buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
                     
-                    // Add it to LotInfo as well(for reporting purpose)
+                    // Add it to LotInfo as well
                     lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
 
                     // Mint the required tokens
@@ -686,5 +711,4 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         lotsInfo[SALE_LOT3].buyerInfo[user].bonusTokensAlotted +
         lotsInfo[SALE_LOT4].buyerInfo[user].bonusTokensAlotted;
     }
-
 }
