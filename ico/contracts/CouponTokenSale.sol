@@ -29,6 +29,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     // Founders list
     mapping(address => uint256) founders;
+    uint256 totalFounderTokens;                  // total tokens alotted to founders
 
     // Coupon Token contract address
     CouponToken public couponToken;
@@ -75,6 +76,10 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     // List of Lots information
     mapping(uint8 => LotInfos) lotsInfo;
 
+    // mapping to store bonus(PoolBonus, AirDrop, Boundty, Campaign and Referral) for user
+    mapping(address => uint256) userBonusTokens;
+
+
     /*
      * Events
      */
@@ -119,6 +124,14 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     modifier onlyCallFromCouponCampaign {
         require(msg.sender == couponCampaignAddr);
+        _;
+    }
+
+    modifier onlyCallFromBonusContracts {
+        require(
+            msg.sender == address(this) ||
+            msg.sender == bountyAddr    ||
+            msg.sender == couponCampaignAddr);
         _;
     }
    
@@ -242,6 +255,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
             // Set this user as Founder for Vesting period checking
             couponToken.setFounderUser(Users[i]);
+
+            // Add tokens to variable
+            totalFounderTokens = totalFounderTokens.add(Tokens[i]);
 
             // Emit the event
             emit FounderAdded(Users[i], Tokens[i]);
@@ -457,16 +473,24 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         }
 
         // Check for Referrals
-        if(referrals[purchaser] != address(0x0)) {
+        address refereeAddr = referrals[purchaser];
+        if(refereeAddr != address(0x0)) {
             // Somebody referred this purchaser, calculate referral bonus and allot it
 
             // Check whether 5% referral bonus availabe?
             uint256 referralTokensNeeded = purchaseTokens * 5 / 100;    // 5%
             if(remainingReferralTokens >= referralTokensNeeded) {
                 // 4% to referree and 1% to purchaser
-                uint256 bonusReferral = purchaseTokens * 4 / 100;
-                couponToken.mint(referrals[purchaser], bonusReferral);
-                couponToken.mint(purchaser, (purchaseTokens * 1 / 100));
+                uint256 bonusReferral = purchaseTokens * 4 / 100;           // 4%
+                uint256 bonusPurchaser = purchaseTokens * 1 / 100;          // 1%
+
+                // mint the bonus tokens and transfer to Referee and purchaser
+                couponToken.mint(refereeAddr, bonusReferral);
+                couponToken.mint(purchaser, bonusPurchaser);
+
+                // Add it to bonus as well
+                addBounusTokens(refereeAddr, bonusReferral);
+                addBounusTokens(purchaser, bonusPurchaser);
             }
 
             // Decrease the total
@@ -503,20 +527,23 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                 // Enumerate and allot bonus
                 for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
 
-                    address addr = lotsInfo[i].buyersList[j];
-                    BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[addr];
+                    address buyer = lotsInfo[i].buyersList[j];
+                    BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[buyer];
                     
                     // Bonus eligible?
                     if(buyerInfo.bonusEligible) {
                         
                         // Allot bonus tokens                    
                         buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
+
+                        // Add it to bonus as well
+                        addBounusTokens(buyer, buyerInfo.bonusTokensAlotted);
                         
                         // Add it to LotInfo as well
                         lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
 
                         // Mint the required tokens
-                        couponToken.mint(addr, buyerInfo.bonusTokensAlotted);
+                        couponToken.mint(buyer, buyerInfo.bonusTokensAlotted);
                     }           
                 }
             }
@@ -559,6 +586,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
             // Set this user as bonus alloted
             couponToken.setBonusUser(users[i]);
+
+            // Add it to bonus as well
+            this.addBounusTokens(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
@@ -626,6 +656,19 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         referrals[user] = referredBy;
     }
 
+    /*
+     *
+     * Function: addBounusTokens()
+     *
+    */  
+    function addBounusTokens(address user, uint256 tokens)
+        public
+        onlyCallFromBonusContracts {
+        
+        userBonusTokens[user] = userBonusTokens[user].add(tokens);
+
+    }
+
     //*************************************************************************/
     //
     //
@@ -657,7 +700,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     function dashboardGetAllIssuedTokens() 
         external view
         returns (uint256 tokenSold, uint256 tokenBonus, uint256 tokenAirDrop, 
-        uint256 tokenBounty, uint256 tokenCampaign, uint256 tokenReferral) {
+        uint256 tokenBounty, uint256 tokenCampaign, uint256 tokenReferral, uint256 tokenFounder) {
 
         //
         // Calculate return values
@@ -671,6 +714,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         tokenBounty = (MAX_CAP_BOUNTY_PROGRAM - remainingBountyTokens);
         tokenCampaign = (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
         tokenReferral = (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens);
+
+        // Token Founders
+        tokenFounder = totalFounderTokens;
     }
 
     function dasboardGetCurrentSaleLot() 
@@ -705,9 +751,6 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         lotsInfo[SALE_LOT4].buyerInfo[user].noOfTokensBought;
 
         // Calculate Bouns tokens
-        tokensBouns = lotsInfo[SALE_LOT1].buyerInfo[user].bonusTokensAlotted +
-        lotsInfo[SALE_LOT2].buyerInfo[user].bonusTokensAlotted +
-        lotsInfo[SALE_LOT3].buyerInfo[user].bonusTokensAlotted +
-        lotsInfo[SALE_LOT4].buyerInfo[user].bonusTokensAlotted;
+        tokensBouns = userBonusTokens[user];
     }
 }

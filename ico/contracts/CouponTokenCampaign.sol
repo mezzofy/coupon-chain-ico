@@ -211,8 +211,10 @@ contract CouponTokenCampaign {
 
         // Subtract it from the Remaining tokens
         couponTokenSale.subtractCampaignTokens(campaignTokens);
-        
 
+        // Add tokens to user bonus
+        couponTokenSale.addBounusTokens(user, campaignTokens);
+        
         // Mark this coupon as redeemed
         couponInfo[coupon].redeemed = true;
         

@@ -157,6 +157,9 @@ contract CouponTokenBounty {
         // Subtract it from the Remaining tokens
         couponTokenSale.subtractBountyTokens(bountyTokens);
 
+        // Add tokens to user bonus
+        couponTokenSale.addBounusTokens(user, bountyTokens);
+
         bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
 
         emit BountyAction("Bounty Fullfilled", bountyId);
