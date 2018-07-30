@@ -478,19 +478,19 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             // Somebody referred this purchaser, calculate referral bonus and allot it
 
             // Check whether 5% referral bonus availabe?
-            uint256 referralTokensNeeded = purchaseTokens * 5 / 100;    // 5%
+            uint256 referralTokensNeeded = purchaseTokens.mul(5).div(100);    // 5%
             if(remainingReferralTokens >= referralTokensNeeded) {
                 // 4% to referree and 1% to purchaser
-                uint256 bonusReferral = purchaseTokens * 4 / 100;           // 4%
-                uint256 bonusPurchaser = purchaseTokens * 1 / 100;          // 1%
+                uint256 bonusReferral = purchaseTokens.mul(4).div(100);           // 4%
+                uint256 bonusPurchaser = purchaseTokens.mul(1).div(100);          // 1%
 
                 // mint the bonus tokens and transfer to Referee and purchaser
                 couponToken.mint(refereeAddr, bonusReferral);
                 couponToken.mint(purchaser, bonusPurchaser);
 
                 // Add it to bonus as well
-                addBounusTokens(refereeAddr, bonusReferral);
-                addBounusTokens(purchaser, bonusPurchaser);
+                addBounusLocalTokens(refereeAddr, bonusReferral);
+                addBounusLocalTokens(purchaser, bonusPurchaser);
             }
 
             // Decrease the total
@@ -537,7 +537,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                         buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
 
                         // Add it to bonus as well
-                        addBounusTokens(buyer, buyerInfo.bonusTokensAlotted);
+                        addBounusLocalTokens(buyer, buyerInfo.bonusTokensAlotted);
                         
                         // Add it to LotInfo as well
                         lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
@@ -588,7 +588,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             couponToken.setBonusUser(users[i]);
 
             // Add it to bonus as well
-            this.addBounusTokens(users[i], tokens);
+            addBounusLocalTokens(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
@@ -638,9 +638,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         onlyCallFromCouponCampaign {
         remainingCouponTokens = remainingCouponTokens.sub(noOfTokens);
     }
-
-    
-
+ 
     /*
      *
      * Function: addReferrer()
@@ -667,6 +665,11 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         
         userBonusTokens[user] = userBonusTokens[user].add(tokens);
 
+    }
+
+    function addBounusLocalTokens(address user, uint256 tokens)
+        internal {
+        userBonusTokens[user] = userBonusTokens[user].add(tokens);
     }
 
     //*************************************************************************/
