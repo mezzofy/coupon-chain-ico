@@ -37,6 +37,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
     // TreasuryTokens
     uint256 public remainingTreasuryTokens;
 
+    // Remainging PoolBonus Tokens
+    uint256 public remainingPoolBonusTokens;
+
     // Campaigns Tokens
     uint256 public remainingAirDropTokens;
     uint256 public remainingBountyTokens;
@@ -168,6 +171,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
         // Initialize
         remainingTreasuryTokens = MAX_CAP_FOR_TREASURY;
+
+        // Init PoolBonus Token
+        remainingPoolBonusTokens = MAX_CAP_POOLBONUS;
 
         // Initialize Campaign bonus values
         remainingAirDropTokens = MAX_CAP_AIRDROP_PROGRAM;
@@ -321,15 +327,17 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
          *  AirDropTokens, BountyTokens, ReferralTokens and CouponTokens are the subset of Treasury balace
          */
         uint256 treasuryTokens = remainingTreasuryTokens - 
+            (MAX_CAP_POOLBONUS - remainingPoolBonusTokens) -
             (MAX_CAP_AIRDROP_PROGRAM - remainingAirDropTokens) - 
             (MAX_CAP_BOUNTY_PROGRAM - remainingBountyTokens) -
             (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens) -
             (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
 
+        
         for(uint8 i = 0; i<MAX_SALE_LOTS; i++) {
             LotInfos memory linfo = lotsInfo[i];
             // Check all poolBonus tokens are issued, if not it should goto treasury a/c    
-            treasuryTokens = treasuryTokens.add(linfo.poolBonus - linfo.bonusTokens);
+            //treasuryTokens = treasuryTokens.add(linfo.poolBonus - linfo.bonusTokens);
 
             // Unsold tokens should goto treasury a/c
             if(linfo.totalTokens > linfo.soldTokens)
@@ -531,7 +539,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                 for(uint32 j = 0; j < lotsInfo[i].buyersList.length; j++) {
 
                     address buyer = lotsInfo[i].buyersList[j];
-                    BuyerInfoForPoolBonus storage buyerInfo = lotsInfo[i].buyerInfo[buyer];
+                    BuyerInfoForPoolBonus memory buyerInfo = lotsInfo[i].buyerInfo[buyer];
                     
                     // Bonus eligible?
                     if(buyerInfo.bonusEligible) {

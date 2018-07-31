@@ -50,6 +50,9 @@ contract CouponTokenSaleConfig {
 
     uint256 constant POOL_BONUS_ELIGIBLE = 50000 * DECIMALS_FACTOR; // 50 thousand
 
+    // Maximum Cap for PoolBonus
+    uint256 constant MAX_CAP_POOLBONUS = (POOL_BONUS_LOT1 + POOL_BONUS_LOT2 + POOL_BONUS_LOT3 + POOL_BONUS_LOT4);
+
     // Max.Cap for Campaigns, which are all taken from Treasury
     uint256 constant MAX_CAP_AIRDROP_PROGRAM = 25000000 * DECIMALS_FACTOR; // 25 million
     uint256 constant MAX_CAP_BOUNTY_PROGRAM =  15000000 * DECIMALS_FACTOR; // 15 million
