@@ -1,4 +1,4 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
@@ -489,8 +489,8 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                 couponToken.mint(purchaser, bonusPurchaser);
 
                 // Add it to bonus as well
-                addBounusLocalTokens(refereeAddr, bonusReferral);
-                addBounusLocalTokens(purchaser, bonusPurchaser);
+                this.addBonusTokens(refereeAddr, bonusReferral);
+                this.addBonusTokens(purchaser, bonusPurchaser);
             }
 
             // Decrease the total
@@ -537,7 +537,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                         buyerInfo.bonusTokensAlotted = lotsInfo[i].poolBonus.mul(buyerInfo.noOfTokensBought).div(lotsInfo[i].cumulativeBonusTokens);
 
                         // Add it to bonus as well
-                        addBounusLocalTokens(buyer, buyerInfo.bonusTokensAlotted);
+                        this.addBonusTokens(buyer, buyerInfo.bonusTokensAlotted);
                         
                         // Add it to LotInfo as well
                         lotsInfo[i].bonusTokens = lotsInfo[i].bonusTokens.add(buyerInfo.bonusTokensAlotted);
@@ -588,7 +588,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             couponToken.setBonusUser(users[i]);
 
             // Add it to bonus as well
-            addBounusLocalTokens(users[i], tokens);
+            this.addBonusTokens(users[i], tokens);
         }
         // Subtract it from the Remaining tokens
         remainingAirDropTokens = remainingAirDropTokens.sub(totalTokens);
@@ -651,25 +651,29 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         onlyValidAddress(referredBy)
         atStage(Stages.Started) {
 
+        // Should not be 0
+        require(user != address(0) && referredBy != address(0));
+        
+	// Should not be the same address
+        require(user != referredBy);
+
+        // Should be referred only once
+        require(referrals[user] == address(0));
+
         referrals[user] = referredBy;
     }
 
     /*
      *
-     * Function: addBounusTokens()
+     * Function: addBonusTokens()
      *
     */  
-    function addBounusTokens(address user, uint256 tokens)
+    function addBonusTokens(address user, uint256 tokens)
         public
         onlyCallFromBonusContracts {
         
         userBonusTokens[user] = userBonusTokens[user].add(tokens);
 
-    }
-
-    function addBounusLocalTokens(address user, uint256 tokens)
-        internal {
-        userBonusTokens[user] = userBonusTokens[user].add(tokens);
     }
 
     //*************************************************************************/

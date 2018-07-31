@@ -1,4 +1,4 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.24;
 
 import "./CouponToken.sol";
 import "./CouponTokenSale.sol";
@@ -158,7 +158,7 @@ contract CouponTokenBounty {
         couponTokenSale.subtractBountyTokens(bountyTokens);
 
         // Add tokens to user bonus
-        couponTokenSale.addBounusTokens(user, bountyTokens);
+        couponTokenSale.addBonusTokens(user, bountyTokens);
 
         bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
 

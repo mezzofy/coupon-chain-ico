@@ -1,4 +1,4 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.24;
 
 
 import "./CouponToken.sol";
@@ -213,7 +213,7 @@ contract CouponTokenCampaign {
         couponTokenSale.subtractCampaignTokens(campaignTokens);
 
         // Add tokens to user bonus
-        couponTokenSale.addBounusTokens(user, campaignTokens);
+        couponTokenSale.addBonusTokens(user, campaignTokens);
         
         // Mark this coupon as redeemed
         couponInfo[coupon].redeemed = true;
