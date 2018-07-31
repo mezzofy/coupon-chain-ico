@@ -728,16 +728,14 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     function dasboardGetCurrentSaleLot() 
         external view
-        atStage(Stages.Started) 
         returns (uint8) {
         
         // Return current Sale Lot number
         return currLot; // Change it to 1 based index
     }
 
-    function dashboardGetSaleLotSales(uint8 lotNumber)  // Input is 1 based index
+    function dashboardGetSaleLotSales(uint8 lotNumber)
         external view
-        atStage(Stages.Started) 
         returns (uint256) {
 
         require(lotNumber >= SALE_LOT1 && lotNumber <= SALE_LOT4);
