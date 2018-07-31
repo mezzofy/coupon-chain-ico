@@ -557,6 +557,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
                         couponToken.mint(buyer, buyerInfo.bonusTokensAlotted);
                     }           
                 }
+                remainingPoolBonusTokens = remainingPoolBonusTokens.sub(lotsInfo[i].bonusTokens);
             }
 
             // Mark as Pool Bonus alloted
