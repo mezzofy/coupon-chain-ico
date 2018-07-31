@@ -307,6 +307,9 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         // Flag to prevent the second call of this function
         require(endSalesFlag == false);
 
+        // Sale-stage should be started or auto-ended in Lot4 Sales
+        require(stage == Stages.Started || stage == Stages.Ended);
+
         // Sale is going to end, so force calculate bonus for un-finished sale-lots aswell
         calcPoolBonus(MAX_SALE_LOTS);
 
@@ -515,11 +518,11 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
      * Function: calcPoolBonus()
      *
      */
-    function calcPoolBonus(uint8 _currLot) private {
+    function calcPoolBonus(uint8 _currLot) internal {
 
         // Calculate PoolBonus for all the previous lots of current lot
         for(uint8 i = 0; i < _currLot; i++) {
-            // Continue the loop of Pool bonus calculated already
+            // Continue the loop if Pool bonus calculated already
             if(lotsInfo[i].poolBonusCalculated == true) continue;
 
             // contine the loop if nothing to calculate
