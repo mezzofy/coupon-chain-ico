@@ -483,29 +483,43 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             } 
         }
 
+        //
+        // Calculate referral bonus
+        //
         // Check for Referrals
         address refereeAddr = referrals[purchaser];
         if(refereeAddr != address(0x0)) {
             // Somebody referred this purchaser, calculate referral bonus and allot it
 
             // Check whether 5% referral bonus availabe?
-            uint256 referralTokensNeeded = purchaseTokens.mul(5).div(100);    // 5%
-            if(remainingReferralTokens >= referralTokensNeeded) {
-                // 4% to referree and 1% to purchaser
-                uint256 bonusReferral = purchaseTokens.mul(4).div(100);           // 4%
-                uint256 bonusPurchaser = purchaseTokens.mul(1).div(100);          // 1%
+            uint256 referralTokensNeeded = purchaseTokens.mul(5).div(100);         // 5%
 
-                // mint the bonus tokens and transfer to Referee and purchaser
-                couponToken.mint(refereeAddr, bonusReferral);
-                couponToken.mint(purchaser, bonusPurchaser);
+            if(remainingReferralTokens < referralTokensNeeded) {
+                // No sufficient referral bonus available, borrow it from Treasury a/c
+                needToTakeFromTreasury = referralTokensNeeded.sub(remainingReferralTokens);
 
-                // Add it to bonus as well
-                this.addBonusTokens(refereeAddr, bonusReferral);
-                this.addBonusTokens(purchaser, bonusPurchaser);
+                //Subtract it from Remaining treasury tokens
+                remainingTreasuryTokens = remainingTreasuryTokens.sub(needToTakeFromTreasury);
+
+                // Reset Referral token with available token
+                referralTokensNeeded = remainingReferralTokens;
             }
+            
+            // 4% to referree and 1% to purchaser
+            uint256 bonusReferral = purchaseTokens.mul(4).div(100);           // 4%
+            uint256 bonusPurchaser = purchaseTokens.mul(1).div(100);          // 1%
+
+            // mint the bonus tokens and transfer to Referee and purchaser
+            couponToken.mint(refereeAddr, bonusReferral);
+            couponToken.mint(purchaser, bonusPurchaser);
+
+            // Add it to bonus as well
+            this.addBonusTokens(refereeAddr, bonusReferral);
+            this.addBonusTokens(purchaser, bonusPurchaser);
 
             // Decrease the total
             remainingReferralTokens = remainingReferralTokens.sub(referralTokensNeeded);
+            
         }
     }
 
