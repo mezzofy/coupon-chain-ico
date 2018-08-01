@@ -29,10 +29,12 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
 
     // Founders list
     mapping(address => uint256) founders;
-    uint256 totalFounderTokens;                  // total tokens alotted to founders
 
     // Coupon Token contract address
     CouponToken public couponToken;
+
+    // Founder Tokens
+    uint256 public remainingFounderTokens;                  
 
     // TreasuryTokens
     uint256 public remainingTreasuryTokens;
@@ -169,13 +171,11 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         lotsInfo[SALE_LOT4].rateInCents = RATE_FOR_LOT4;
         lotsInfo[SALE_LOT4].poolBonus = POOL_BONUS_LOT4;
 
-        // Initialize
+
+        // Initialize remaining tokens
+        remainingFounderTokens = MAX_CAP_FOR_FOUNDERS;
         remainingTreasuryTokens = MAX_CAP_FOR_TREASURY;
-
-        // Init PoolBonus Token
         remainingPoolBonusTokens = MAX_CAP_POOLBONUS;
-
-        // Initialize Campaign bonus values
         remainingAirDropTokens = MAX_CAP_AIRDROP_PROGRAM;
         remainingBountyTokens = MAX_CAP_BOUNTY_PROGRAM;
         remainingCouponTokens = MAX_CAP_COUPON_PROGRAM;
@@ -248,7 +248,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         }
         
         // Total tokens should be more than CAP
-        require(totalFounderAllocation <= MAX_CAP_FOR_FOUNDERS);
+        require(totalFounderAllocation <= remainingFounderTokens);
 
          // Allocation for founders 
         for(i = 0; i < Users.length; i++) { 
@@ -263,7 +263,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             couponToken.setFounderUser(Users[i]);
 
             // Add tokens to variable
-            totalFounderTokens = totalFounderTokens.add(Tokens[i]);
+            remainingFounderTokens = remainingFounderTokens.sub(Tokens[i]);
 
             // Emit the event
             emit FounderAdded(Users[i], Tokens[i]);
@@ -333,6 +333,10 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
             (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens) -
             (MAX_CAP_COUPON_PROGRAM - remainingCouponTokens);
 
+
+        // Add to treasury a/c if any unallotted Founder tokens exist
+        if(remainingFounderTokens > 0)
+            treasuryTokens = treasuryTokens.add(remainingFounderTokens);
         
         for(uint8 i = 0; i<MAX_SALE_LOTS; i++) {
             LotInfos memory linfo = lotsInfo[i];
@@ -351,6 +355,12 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         if(stage == Stages.Started) {
             couponToken.setSalesEndTime(now);
             stage = Stages.Ended;
+        }
+
+        // Set the SaleLot4StartTime as now if the current-lot is not SALE_LOT4 or more
+        if(currLot < SALE_LOT4){
+            // This statement executed only when endSale called prior to SaleLot4 started.
+            couponToken.setSaleLot4StartTime(now);
         }
 
         endSalesFlag = true;
@@ -749,7 +759,7 @@ contract CouponTokenSale is Pausable, CouponTokenSaleConfig {
         tokenReferral = (MAX_CAP_REFERRAL_PROGRAM - remainingReferralTokens);
 
         // Token Founders
-        tokenFounder = totalFounderTokens;
+        tokenFounder = (MAX_CAP_FOR_FOUNDERS - remainingFounderTokens);
     }
 
     function dasboardGetCurrentSaleLot() 
