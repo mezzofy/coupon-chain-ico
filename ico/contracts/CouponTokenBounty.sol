@@ -143,7 +143,7 @@ contract CouponTokenBounty {
             bountyProgram[bountyId].activated == true && 
             bountyProgram[bountyId].killed == false);
 
-        // This user should not be fullfilement done already
+        // For this user fullfilment should not be done already
         require(bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == false);
 
         uint256 bountyTokens = bountyProgram[bountyId].tokensForEvent;
