@@ -1,21 +1,15 @@
 pragma solidity ^0.4.24;
 
-
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./CouponToken.sol";
 import "./CouponTokenSale.sol";
 
 contract CouponTokenCampaign {
-    
+    using SafeMath for uint256;
     address private owner;
 
     CouponToken couponToken;
     CouponTokenSale couponTokenSale;
-
-   
-    struct UserInfoForCampaign {
-        bool fullfillmentDone;
-        uint256 bonusTokensAlotted;
-    }
 
     struct EventData {
         string eventName;
@@ -23,7 +17,7 @@ contract CouponTokenCampaign {
         bool activated;
         bool killed;
         uint32 noOfCouponsAdded; 
-        mapping (address => UserInfoForCampaign) userInfoForCampaign;
+        uint256 tokensIssued;
     }
 
     struct CouponCampaignInfo {
@@ -199,13 +193,15 @@ contract CouponTokenCampaign {
             couponCampaignProgram[campaignId].activated == true && 
             couponCampaignProgram[campaignId].killed == false);
 
-        // This user should be participated already and fullfilement not done
-        require(couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == false);
 
         uint256 campaignTokens = couponCampaignProgram[campaignId].tokensForEvent;
 
         // Mint the required tokens
         couponToken.mint(user, campaignTokens);
+
+        // Add it to issuedTokens as well
+        couponCampaignProgram[campaignId].tokensIssued = couponCampaignProgram[campaignId].tokensIssued.add(campaignTokens);
+
         // Set this user as bonus alloted
         couponToken.setBonusUser(user);
 
@@ -218,7 +214,6 @@ contract CouponTokenCampaign {
         // Mark this coupon as redeemed
         couponInfo[coupon].redeemed = true;
         
-        couponCampaignProgram[campaignId].userInfoForCampaign[user].fullfillmentDone == true;
 
         emit CouponCampaignAction("Coupon Redeemed in Campaign", campaignId);
     }

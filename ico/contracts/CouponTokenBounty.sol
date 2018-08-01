@@ -1,10 +1,12 @@
 pragma solidity ^0.4.24;
 
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./CouponToken.sol";
 import "./CouponTokenSale.sol";
 
 
 contract CouponTokenBounty {
+    using SafeMath for uint256;
 
     address private owner;
 
@@ -12,17 +14,12 @@ contract CouponTokenBounty {
     CouponTokenSale couponTokenSale;
 
    
-    struct UserInfoForCampaign {
-        bool fullfillmentDone;
-        uint256 bonusTokensAlotted;
-    }
-
     struct EventData {
         string eventName;
         uint256 tokensForEvent;
         bool activated;
         bool killed;
-        mapping (address => UserInfoForCampaign) userInfoForCampaign;
+        uint256 tokensIssued;
     }
 
     // Event Data for Bounty Program
@@ -143,13 +140,14 @@ contract CouponTokenBounty {
             bountyProgram[bountyId].activated == true && 
             bountyProgram[bountyId].killed == false);
 
-        // User is allowed to participate the each bounty program only once
-        require(bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == false);
 
         uint256 bountyTokens = bountyProgram[bountyId].tokensForEvent;
 
          // Mint the required tokens
         couponToken.mint(user, bountyTokens);
+
+        // Add it to issuedTokens as well
+        bountyProgram[bountyId].tokensIssued = bountyProgram[bountyId].tokensIssued.add(bountyTokens);
 
         // Set this user as bonus alloted
         couponToken.setBonusUser(user);
@@ -160,7 +158,6 @@ contract CouponTokenBounty {
         // Add tokens to user bonus
         couponTokenSale.addBonusTokens(user, bountyTokens);
 
-        bountyProgram[bountyId].userInfoForCampaign[user].fullfillmentDone == true;
 
         emit BountyAction("Bounty Fullfilled", bountyId);
     }
