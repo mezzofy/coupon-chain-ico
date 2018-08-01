@@ -192,7 +192,7 @@ contract CouponTokenCampaign {
 
         // Sufficient tokens available?
         uint32 campaignId = couponInfo[coupon].campaignId;
-        require(couponTokenSale.remainingBountyTokens() >= couponCampaignProgram[campaignId].tokensForEvent);
+        require(couponTokenSale.remainingCouponTokens() >= couponCampaignProgram[campaignId].tokensForEvent);
 
         require(
             campaignId < couponCampaignIndex &&
