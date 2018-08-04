@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
+import "./SafeMath.sol";
+import "./Pausable.sol";
 import "./CouponToken.sol";
 import "./CouponTokenSaleConfig.sol";
 
